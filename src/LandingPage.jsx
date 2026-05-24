@@ -102,7 +102,6 @@ export default function LandingPage({
               placeholder="Marka, model veya arıza arayın… (ör: TSI zincir, DSG sarsıntı)"
               value={searchVal}
               onChange={(e) => { setSearchVal(e.target.value); onSearch(e.target.value); }}
-              autoFocus
             />
             <button type="button" onClick={() => onExploreAll()} className="lp-search-btn">Ara</button>
           </div>
