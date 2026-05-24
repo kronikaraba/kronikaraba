@@ -34,17 +34,13 @@
   --font: 'Inter', system-ui, sans-serif;
 }
 
-html {
-  overflow-y: scroll;
-}
-
 body {
   font-family: var(--font);
   background: #F9FAFB;
   color: var(--gray-900);
   min-height: 100vh;
   line-height: 1.5;
-  overflow-x: hidden;
+  
 }
 
 h1,
@@ -5995,6 +5991,8 @@ body:has(.live-edit-bar) {
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .landing-page-wrap {
+  width: 100%;
+  background: var(--gray-50);
   padding-top: var(--navbar-h);
 }
 
