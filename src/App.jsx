@@ -908,7 +908,9 @@ function AppContent() {
               </div>
             </div>
 
-            <ActivePills filters={filters} onFilters={setFilters} />
+            <div className="active-pills-slot">
+              <ActivePills filters={filters} onFilters={setFilters} />
+            </div>
 
             {filtered.length === 0 ? (
               <div className="empty-state">
