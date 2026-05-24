@@ -1,28 +1,41 @@
-import { useState, useMemo } from 'react';
-import { loadAdminFaults, loadAdminModels } from './AdminPanel.jsx';
+import { useState, useMemo, useEffect } from 'react';
 import { CommentSection } from './comments.jsx';
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 const fmtCost = (min, max) => `₺${fmt(min)} – ₺${fmt(max)}`;
 
 const SPEC_LABELS = {
-  motor: '🔧 Motor', beygir: '🐎 Güç', tork: '⚡ Tork',
-  sanziman: '⚙️ Şanzıman', yakit: '⛽ Yakıt', hiz: '🏁 Hız',
-  agirlik: '⚖️ Ağırlık', bagaj: '🧳 Bagaj',
+  motor: 'Motor', beygir: 'Güç', tork: 'Tork',
+  sanziman: 'Şanzıman', yakit: 'Yakıt', hiz: 'Maksimum Hız',
+  agirlik: 'Ağırlık', bagaj: 'Bagaj Hacmi',
 };
 
-export default function ModelDetailPage({ model, onBack, user, onAuthRequest }) {
-  const detail = useMemo(() => loadAdminModels()[model], [model]);
-  const faults = useMemo(() => loadAdminFaults().filter(f => f.model === model), [model]);
+export default function ModelDetailPage({
+  model, models, faults, adminMode,
+  onBack, onEditModel, onCreateModel, user, onAuthRequest,
+}) {
+  const detail = useMemo(() => models[model], [models, model]);
+  const modelFaults = useMemo(() => faults.filter(f => f.model === model), [faults, model]);
   const [activeTab, setActiveTab] = useState('overview');
 
+  useEffect(() => {
+    const prev = document.title;
+    const brand = modelFaults[0]?.brand || '';
+    document.title = `${brand} ${model} — Kronik Arızalar | KronikAraba`;
+    return () => { document.title = prev; };
+  }, [model, modelFaults]);
   if (!detail) {
     return (
       <div className="detail-page">
         <button className="detail-back" onClick={onBack}>← Geri Dön</button>
         <div className="detail-empty">
           <h2>Model bilgisi bulunamadı</h2>
-          <p>{model} modeli için henüz detaylı bilgi eklenmemiştir.</p>
+          <p>{model} modeli için henüz detaylı makale eklenmemiştir.</p>
+          {adminMode && (
+            <button type="button" className="btn-submit" style={{ marginTop: 16 }} onClick={onCreateModel}>
+              + Model makalesi oluştur
+            </button>
+          )}
         </div>
       </div>
     );
@@ -30,7 +43,6 @@ export default function ModelDetailPage({ model, onBack, user, onAuthRequest }) 
 
   return (
     <div className="detail-page">
-      {/* Back Button */}
       <button className="detail-back" onClick={onBack}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
           <polyline points="15 18 9 12 15 6"/>
@@ -38,29 +50,36 @@ export default function ModelDetailPage({ model, onBack, user, onAuthRequest }) 
         Tüm Arızalara Dön
       </button>
 
-      {/* Hero Section */}
+      {adminMode && (
+        <div className="detail-admin-bar">
+          <button type="button" className="btn-submit btn-sm" onClick={() => onEditModel(model, detail)}>
+            ✏️ Makaleyi düzenle
+          </button>
+        </div>
+      )}
+
       <div className="detail-hero">
         <div className="detail-hero-content">
-          <div className="detail-hero-badge">{faults[0]?.brand}</div>
+          <div className="detail-hero-badge">{modelFaults[0]?.brand}</div>
           <h1 className="detail-hero-title">{detail.heroTitle}</h1>
           <p className="detail-hero-subtitle">{detail.heroSubtitle}</p>
           <div className="detail-hero-stats">
             <div className="hero-stat">
-              <span className="hero-stat-value">{faults.length}</span>
+              <span className="hero-stat-value">{modelFaults.length}</span>
               <span className="hero-stat-label">Kronik Arıza</span>
             </div>
             <div className="hero-stat">
               <span className="hero-stat-value">
-                {fmt(faults.reduce((s, f) => s + f.reportCount, 0))}
+                {fmt(modelFaults.reduce((s, f) => s + f.reportCount, 0))}
               </span>
               <span className="hero-stat-label">Toplam Doğrulama</span>
             </div>
             <div className="hero-stat">
               <span className="hero-stat-value">
-                {fmtCost(
-                  Math.min(...faults.map(f => f.costMin)),
-                  Math.max(...faults.map(f => f.costMax))
-                )}
+                {modelFaults.length ? fmtCost(
+                  Math.min(...modelFaults.map(f => f.costMin)),
+                  Math.max(...modelFaults.map(f => f.costMax))
+                ) : '—'}
               </span>
               <span className="hero-stat-label">Masraf Aralığı</span>
             </div>
@@ -76,13 +95,12 @@ export default function ModelDetailPage({ model, onBack, user, onAuthRequest }) 
         </div>
       </div>
 
-      {/* Tab Navigation */}
       <div className="detail-tabs">
         {[
-          { key: 'overview', label: '📋 Genel Bilgi' },
-          { key: 'specs', label: '⚙️ Teknik Özellikler' },
-          { key: 'faults', label: `🔴 Kronik Arızalar (${faults.length})` },
-          { key: 'maintenance', label: '🛠️ Bakım Rehberi' },
+          { key: 'overview', label: 'Genel Bilgi' },
+          { key: 'specs', label: 'Teknik Özellikler' },
+          { key: 'faults', label: `Kronik Arızalar (${modelFaults.length})` },
+          { key: 'maintenance', label: 'Bakım Rehberi' },
         ].map(t => (
           <button
             key={t.key}
@@ -94,41 +112,27 @@ export default function ModelDetailPage({ model, onBack, user, onAuthRequest }) 
         ))}
       </div>
 
-      {/* Tab Content */}
       <div className="detail-content">
-
-        {/* === OVERVIEW === */}
         {activeTab === 'overview' && (
           <div className="detail-section detail-fade-in">
-            {/* Blog Intro */}
             <div className="blog-card">
               <div className="blog-card-header">
-                <div className="blog-card-icon">📰</div>
                 <h2>Model Hakkında</h2>
               </div>
               <p className="blog-text">{detail.blogIntro}</p>
             </div>
-
-            {/* Strengths & Weaknesses */}
             <div className="detail-two-col">
               <div className="sw-card sw-good">
-                <h3><span className="sw-icon">✅</span> Güçlü Yönler</h3>
-                <ul>
-                  {detail.strengths.map((s, i) => <li key={i}>{s}</li>)}
-                </ul>
+                <h3>Güçlü Yönler</h3>
+                <ul>{detail.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
               </div>
               <div className="sw-card sw-bad">
-                <h3><span className="sw-icon">⚠️</span> Zayıf Yönler</h3>
-                <ul>
-                  {detail.weaknesses.map((w, i) => <li key={i}>{w}</li>)}
-                </ul>
+                <h3>Zayıf Yönler</h3>
+                <ul>{detail.weaknesses.map((w, i) => <li key={i}>{w}</li>)}</ul>
               </div>
             </div>
-
-            {/* Buyer Advice */}
             <div className="blog-card advice-card">
               <div className="blog-card-header">
-                <div className="blog-card-icon">💡</div>
                 <h2>Alıcı Tavsiyesi</h2>
               </div>
               <p className="blog-text">{detail.buyerAdvice}</p>
@@ -136,7 +140,6 @@ export default function ModelDetailPage({ model, onBack, user, onAuthRequest }) 
           </div>
         )}
 
-        {/* === SPECS === */}
         {activeTab === 'specs' && (
           <div className="detail-section detail-fade-in">
             <div className="specs-grid">
@@ -150,10 +153,9 @@ export default function ModelDetailPage({ model, onBack, user, onAuthRequest }) 
           </div>
         )}
 
-        {/* === FAULTS === */}
         {activeTab === 'faults' && (
           <div className="detail-section detail-fade-in">
-            {faults.map(fault => (
+            {modelFaults.map(fault => (
               <div key={fault.id} className="detail-fault-card">
                 <div className="dfc-header">
                   <div>
@@ -182,22 +184,18 @@ export default function ModelDetailPage({ model, onBack, user, onAuthRequest }) 
                     </div>
                   </div>
                 </div>
-
-                {/* Discussion Section for this fault */}
                 <div className="dfc-discussion">
-                  <CommentSection faultId={fault.id} user={user} onAuthRequest={onAuthRequest} />
+                  <CommentSection faultId={fault.id} user={user} onAuthRequest={onAuthRequest} adminMode={adminMode} />
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* === MAINTENANCE === */}
         {activeTab === 'maintenance' && (
           <div className="detail-section detail-fade-in">
             <div className="blog-card">
               <div className="blog-card-header">
-                <div className="blog-card-icon">🛠️</div>
                 <h2>Periyodik Bakım Tablosu</h2>
               </div>
               <div className="maint-timeline">

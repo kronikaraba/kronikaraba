@@ -1,14 +1,5 @@
 import { useState, useEffect } from 'react';
-
-// ── Storage ──────────────────────────────────────────────────────────────────
-const FORUM_KEY = 'ka_forum_v2';
-
-function loadForum() {
-  try { return JSON.parse(localStorage.getItem(FORUM_KEY)) || {}; } catch { return {}; }
-}
-function saveForum(data) {
-  localStorage.setItem(FORUM_KEY, JSON.stringify(data));
-}
+import { loadForum, saveForum, getAdminUsername } from './adminStorage.js';
 
 // ── Seed data — pre-filled forum posts per fault id ──────────────────────────
 const SEED = {
@@ -74,25 +65,42 @@ const SEED = {
 
 // ── Post type config ──────────────────────────────────────────────────────────
 const POST_TYPES = [
-  { value: 'yorum',  label: '💬 Yorum',        desc: 'Deneyim / genel yorum' },
-  { value: 'oneri',  label: '💡 Öneri',         desc: 'Çözüm önerisi' },
-  { value: 'soru',   label: '❓ Soru',          desc: 'Soru sor' },
-  { value: 'usta',   label: '🔧 Usta Önerisi',  desc: 'Uzman tavsiyesi' },
+  { value: 'yorum',  label: 'Yorum',        desc: 'Deneyim / genel yorum' },
+  { value: 'oneri',  label: 'Öneri',         desc: 'Çözüm önerisi' },
+  { value: 'soru',   label: 'Soru',          desc: 'Soru sor' },
+  { value: 'usta',   label: 'Usta Önerisi',  desc: 'Uzman tavsiyesi' },
 ];
 
 function typeConfig(type) {
   switch (type) {
-    case 'usta':  return { icon: '🔧', label: 'Usta Önerisi', cls: 'post-usta' };
-    case 'oneri': return { icon: '💡', label: 'Öneri',        cls: 'post-oneri' };
-    case 'soru':  return { icon: '❓', label: 'Soru',         cls: 'post-soru' };
-    default:      return { icon: '💬', label: 'Yorum',        cls: 'post-yorum' };
+    case 'usta':  return { icon: '', label: 'Usta Önerisi', cls: 'post-usta' };
+    case 'oneri': return { icon: '', label: 'Öneri',        cls: 'post-oneri' };
+    case 'soru':  return { icon: '', label: 'Soru',         cls: 'post-soru' };
+    default:      return { icon: '', label: 'Yorum',        cls: 'post-yorum' };
   }
 }
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 
+export function getCommentCount(faultId) {
+  const stored = loadForum();
+  const posts = stored[faultId] || SEED[faultId] || [];
+  return posts.length + posts.reduce((s, p) => s + (p.replies || []).length, 0);
+}
+
+// Bulk: load forum once, return a map of faultId → total comment count
+export function buildCommentCountMap(faultIds) {
+  const stored = loadForum();
+  const map = {};
+  for (const id of faultIds) {
+    const posts = stored[id] || SEED[id] || [];
+    map[id] = posts.length + posts.reduce((s, p) => s + (p.replies || []).length, 0);
+  }
+  return map;
+}
+
 // ── Reply item ────────────────────────────────────────────────────────────────
-function ReplyItem({ reply, user, onVote }) {
+function ReplyItem({ reply, user, onVote, adminMode, onAdminDeleteReply, onAdminEditReply }) {
   const voted = user && (reply.voters || []).includes(user.id);
   return (
     <div className="forum-reply">
@@ -102,13 +110,30 @@ function ReplyItem({ reply, user, onVote }) {
           <span className="forum-author">{reply.username}</span>
           {reply.isUsta && <span className="usta-tag">Usta</span>}
           <span className="forum-date">{reply.date}</span>
+          {adminMode && (
+            <span className="forum-reply-admin-actions">
+              <button type="button" className="forum-reply-btn forum-admin-btn" onClick={() => onAdminEditReply(reply)} title="Yanıtı Düzenle">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+              <button type="button" className="forum-reply-btn forum-admin-btn" onClick={() => onAdminDeleteReply(reply.id)} title="Yanıtı Sil">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                </svg>
+              </button>
+            </span>
+          )}
         </div>
         <p className="forum-text">{reply.text}</p>
         <button
           className={`forum-vote${voted ? ' voted' : ''}`}
           onClick={() => onVote(reply.id)}
         >
-          👍 {reply.helpful > 0 ? reply.helpful : 'Faydalı'}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 4, verticalAlign: 'middle' }}>
+            <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
+          </svg>
+          {reply.helpful > 0 ? `${reply.helpful} Faydalı` : 'Faydalı'}
         </button>
       </div>
     </div>
@@ -116,7 +141,7 @@ function ReplyItem({ reply, user, onVote }) {
 }
 
 // ── Post item ─────────────────────────────────────────────────────────────────
-function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest }) {
+function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, adminMode, onAdminDelete, onAdminEdit, onAdminDeleteReply, onAdminEditReply }) {
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [showReplies, setShowReplies] = useState(true);
@@ -132,7 +157,7 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest }) 
   };
 
   const handleReplyClick = () => {
-    if (!user) { onAuthRequest(); return; }
+    if (!user && !adminMode) { onAuthRequest(); return; }
     setShowReplyBox(s => !s);
   };
 
@@ -140,9 +165,10 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest }) 
     <div className={`forum-post ${cfg.cls}`}>
       {/* Post type banner */}
       <div className="forum-post-type-bar">
-        <span className="post-type-icon">{cfg.icon}</span>
+        {cfg.icon && <span className="post-type-icon">{cfg.icon}</span>}
         <span className="post-type-label">{cfg.label}</span>
         {post.isUsta && <span className="usta-verified">✓ Doğrulanmış Usta</span>}
+        {adminMode && <span className="forum-admin-badge">🛡 Yönetici Modu</span>}
       </div>
 
       <div className="forum-post-body">
@@ -159,15 +185,37 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest }) 
               className={`forum-vote${voted ? ' voted' : ''}`}
               onClick={() => onVote(post.id)}
             >
-              👍 {post.helpful > 0 ? `${post.helpful} kişi faydalı buldu` : 'Faydalı'}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 4, verticalAlign: 'middle' }}>
+                <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
+              </svg>
+              {post.helpful > 0 ? `${post.helpful} kişi faydalı buldu` : 'Faydalı'}
             </button>
             <button className="forum-reply-btn" onClick={handleReplyClick}>
-              ↩ Yanıtla
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 4, verticalAlign: 'middle' }}>
+                <polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/>
+              </svg>
+              Yanıtla
             </button>
             {(post.replies || []).length > 0 && (
               <button className="forum-reply-btn" onClick={() => setShowReplies(s => !s)}>
-                {showReplies ? '▲' : '▼'} {(post.replies || []).length} yanıt
+                {showReplies ? 'Yanıtları Gizle' : 'Yanıtları Göster'} ({(post.replies || []).length})
               </button>
+            )}
+            {adminMode && (
+              <>
+                <button type="button" className="forum-reply-btn forum-admin-btn" onClick={() => onAdminEdit(post)} title="Konuyu Düzenle">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                  Düzenle
+                </button>
+                <button type="button" className="forum-reply-btn forum-admin-btn danger" onClick={() => onAdminDelete(post.id)} title="Konuyu Sil">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                  </svg>
+                  Sil
+                </button>
+              </>
             )}
           </div>
 
@@ -177,7 +225,10 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest }) 
               {(post.replies || []).map(r => (
                 <ReplyItem
                   key={r.id} reply={r} user={user}
+                  adminMode={adminMode}
                   onVote={(rid) => onVoteReply(post.id, rid)}
+                  onAdminDeleteReply={(rid) => onAdminDeleteReply(post.id, rid)}
+                  onAdminEditReply={(reply) => onAdminEditReply(post.id, reply)}
                 />
               ))}
             </div>
@@ -206,7 +257,10 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest }) 
 }
 
 // ── Main CommentSection ───────────────────────────────────────────────────────
-export function CommentSection({ faultId, user, onAuthRequest }) {
+export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminModeProp, alwaysOpen: alwaysOpenProp }) {
+  // Admin yetkisi: hem live-edit modunda hem de user.isAdmin olan hesapta çalışır
+  const adminMode = adminModeProp || user?.isAdmin === true;
+
   const [forum, setForum] = useState(() => {
     const stored = loadForum();
     // Merge seed data (only if not already stored)
@@ -217,11 +271,12 @@ export function CommentSection({ faultId, user, onAuthRequest }) {
     return merged;
   });
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(alwaysOpenProp || adminMode || false);
   const [newText, setNewText] = useState('');
   const [newType, setNewType] = useState('yorum');
   const [isUsta, setIsUsta] = useState(false);
-  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'usta' | 'oneri' | 'soru'
+  const [activeTab, setActiveTab] = useState('all');
+  const [editPost, setEditPost] = useState(null);   // { postId, replyId?, text, isReply }
 
   const posts = forum[faultId] || [];
 
@@ -236,14 +291,73 @@ export function CommentSection({ faultId, user, onAuthRequest }) {
     }
   }, [faultId]);
 
+  const deletePost = (postId) => {
+    if (!confirm('Bu konuyu silmek istiyor musunuz?')) return;
+    setForum(prev => ({
+      ...prev,
+      [faultId]: (prev[faultId] || []).filter(p => p.id !== postId),
+    }));
+  };
+
+  // Admin: yanıt sil
+  const deleteReply = (postId, replyId) => {
+    if (!confirm('Bu yanıtı silmek istiyor musunuz?')) return;
+    setForum(prev => ({
+      ...prev,
+      [faultId]: (prev[faultId] || []).map(p =>
+        p.id === postId
+          ? { ...p, replies: (p.replies || []).filter(r => r.id !== replyId) }
+          : p
+      ),
+    }));
+  };
+
+  // Admin: yanıt düzenle
+  const editReplyStart = (postId, reply) => {
+    setEditPost({ postId, replyId: reply.id, text: reply.text, isReply: true });
+  };
+
+  const savePostEdit = () => {
+    if (!editPost?.text?.trim()) return;
+    if (editPost.isReply) {
+      // Yanıt düzenleme
+      setForum(prev => ({
+        ...prev,
+        [faultId]: (prev[faultId] || []).map(p =>
+          p.id === editPost.postId
+            ? { ...p, replies: (p.replies || []).map(r =>
+                r.id === editPost.replyId ? { ...r, text: editPost.text.trim() } : r
+              )}
+            : p
+        ),
+      }));
+    } else {
+      // Konu düzenleme
+      setForum(prev => ({
+        ...prev,
+        [faultId]: (prev[faultId] || []).map(p =>
+          p.id === editPost.id ? { ...p, text: editPost.text.trim() } : p
+        ),
+      }));
+    }
+    setEditPost(null);
+  };
+
+  // Admin: konu düzenleme başlat
+  const editPostStart = (post) => {
+    setEditPost({ id: post.id, text: post.text, isReply: false });
+  };
+
   const submitPost = (e) => {
     e.preventDefault();
     if (!newText.trim()) return;
+    const author = adminMode ? getAdminUsername() : user?.username;
+    if (!author) { onAuthRequest(); return; }
     const post = {
       id: `u-${Date.now()}`,
       type: newType,
-      username: user.username,
-      isUsta: newType === 'usta' ? true : isUsta,
+      username: author,
+      isUsta: adminMode ? (newType === 'usta') : (newType === 'usta' ? true : isUsta),
       text: newText.trim(),
       date: new Date().toLocaleDateString('tr-TR'),
       helpful: 0,
@@ -287,9 +401,11 @@ export function CommentSection({ faultId, user, onAuthRequest }) {
   };
 
   const addReply = (postId, text) => {
+    const author = adminMode ? getAdminUsername() : user?.username;
+    if (!author) return;
     const reply = {
       id: `r-${Date.now()}`,
-      username: user.username,
+      username: author,
       isUsta: false,
       text,
       date: new Date().toLocaleDateString('tr-TR'),
@@ -316,37 +432,41 @@ export function CommentSection({ faultId, user, onAuthRequest }) {
   const totalCount = posts.length + posts.reduce((s, p) => s + (p.replies || []).length, 0);
   const ustaCount = posts.filter(p => p.type === 'usta').length;
 
+  const isOpen = alwaysOpenProp || open;
+
   return (
     <>
-      {/* Toggle button */}
-      <button className="card-comments-toggle" onClick={() => setOpen(o => !o)}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-        {totalCount > 0 ? (
-          <>
-            <span className="comment-badge">{totalCount}</span>
-            tartışma
-            {ustaCount > 0 && <span className="usta-count-badge">🔧 {ustaCount} usta önerisi</span>}
-            · {open ? 'gizle' : 'göster'}
-          </>
-        ) : (
-          'Tartışma yok · İlk yorumu yaz'
-        )}
-        <span style={{ marginLeft: 'auto', fontSize: 11 }}>{open ? '▲' : '▼'}</span>
-      </button>
+      {/* Toggle button — hidden when alwaysOpen */}
+      {!alwaysOpenProp && (
+        <button className="card-comments-toggle" onClick={() => setOpen(o => !o)}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          {totalCount > 0 ? (
+            <>
+              <span className="comment-badge">{totalCount}</span>
+              tartışma
+              {ustaCount > 0 && <span className="usta-count-badge">{ustaCount} usta önerisi</span>}
+              · {open ? 'gizle' : 'göster'}
+            </>
+          ) : (
+            'Tartışma yok · İlk yorumu yaz'
+          )}
+          <span style={{ marginLeft: 'auto', fontSize: 11 }}>{open ? '▲' : '▼'}</span>
+        </button>
+      )}
 
-      {open && (
+      {isOpen && (
         <div className="forum-section">
           {/* Tab filter */}
           {posts.length > 0 && (
             <div className="forum-tabs">
               {[
                 { key: 'all', label: 'Tümü', count: posts.length },
-                { key: 'usta', label: '🔧 Usta', count: posts.filter(p => p.type === 'usta').length },
-                { key: 'oneri', label: '💡 Öneri', count: posts.filter(p => p.type === 'oneri').length },
-                { key: 'soru', label: '❓ Soru', count: posts.filter(p => p.type === 'soru').length },
-                { key: 'yorum', label: '💬 Yorum', count: posts.filter(p => p.type === 'yorum').length },
+                { key: 'usta', label: 'Usta', count: posts.filter(p => p.type === 'usta').length },
+                { key: 'oneri', label: 'Öneri', count: posts.filter(p => p.type === 'oneri').length },
+                { key: 'soru', label: 'Soru', count: posts.filter(p => p.type === 'soru').length },
+                { key: 'yorum', label: 'Yorum', count: posts.filter(p => p.type === 'yorum').length },
               ].filter(t => t.key === 'all' || t.count > 0).map(t => (
                 <button
                   key={t.key}
@@ -368,10 +488,15 @@ export function CommentSection({ faultId, user, onAuthRequest }) {
                   key={p.id}
                   post={p}
                   user={user}
+                  adminMode={adminMode}
                   onVote={votePost}
                   onVoteReply={voteReply}
                   onReply={addReply}
                   onAuthRequest={onAuthRequest}
+                  onAdminDelete={deletePost}
+                  onAdminEdit={editPostStart}
+                  onAdminDeleteReply={deleteReply}
+                  onAdminEditReply={editReplyStart}
                 />
               ))}
             </div>
@@ -379,12 +504,23 @@ export function CommentSection({ faultId, user, onAuthRequest }) {
             <div className="forum-empty">Bu kategoride henüz gönderi yok.</div>
           )}
 
-          {/* New post form */}
-          {user ? (
+          {adminMode && (
+            <p className="forum-admin-hint">🛡 Yönetici modu — Tüm konuları ve yanıtları düzenleyebilir, silebilirsiniz.</p>
+          )}
+
+          {(user || adminMode) ? (
             <form className="forum-new-post" onSubmit={submitPost}>
               <div className="forum-new-header">
-                <div className="forum-avatar sm">{user.username[0].toUpperCase()}</div>
-                <span className="forum-new-label">Katkıda bulun</span>
+                <div className="forum-avatar sm">
+                  {adminMode
+                    ? (getAdminUsername() || 'A')[0].toUpperCase()
+                    : (user?.username || '?')[0].toUpperCase()}
+                </div>
+                <span className="forum-new-label">
+                  {adminMode ? (
+                    <><span style={{color:'var(--yellow)', fontWeight:800}}>🛡 {getAdminUsername()}</span> olarak konu aç</>
+                  ) : 'Katkıda bulun'}
+                </span>
               </div>
               <div className="forum-type-row">
                 {POST_TYPES.map(t => (
@@ -431,6 +567,30 @@ export function CommentSection({ faultId, user, onAuthRequest }) {
               <button onClick={onAuthRequest}>giriş yapın veya üye olun</button>
             </div>
           )}
+        </div>
+      )}
+
+      {editPost && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setEditPost(null)}>
+          <div className="modal" role="dialog">
+            <div className="modal-header">
+              <h2>{editPost.isReply ? 'Yanıtı Düzenle' : 'Konuyu Düzenle'}</h2>
+              <button className="modal-close" onClick={() => setEditPost(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <textarea
+                className="forum-textarea"
+                rows={5}
+                value={editPost.text}
+                onChange={e => setEditPost(p => ({ ...p, text: e.target.value }))}
+                style={{ width: '100%', resize: 'vertical' }}
+              />
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn-cancel" onClick={() => setEditPost(null)}>İptal</button>
+              <button type="button" className="btn-submit" onClick={savePostEdit}>Kaydet</button>
+            </div>
+          </div>
         </div>
       )}
     </>

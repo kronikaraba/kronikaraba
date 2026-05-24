@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Editable } from './liveEdit.jsx';
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 
@@ -10,7 +11,8 @@ const BRAND_COLORS = {
 };
 
 // ── MARKALAR ─────────────────────────────────────────────────────────────────
-export function MarkalarlPage({ data, onBrandSelect }) {
+export function MarkalarlPage({ data, content, onBrandSelect }) {
+  const m = content?.markalar || {};
   const brandStats = useMemo(() => {
     const s = {};
     data.forEach(f => {
@@ -29,15 +31,15 @@ export function MarkalarlPage({ data, onBrandSelect }) {
 
   return (
     <div className="page-view">
-      <div className="page-hero" style={{ background: 'linear-gradient(135deg, #0A0A0A 0%, #1E3A5F 60%, #0A1628 100%)' }}>
+      <div className="page-hero" style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)' }}>
         <div className="page-hero-content">
-          <div className="page-hero-badge">🏭 Araç Markaları</div>
-          <h1 className="page-hero-title">Tüm Markalar</h1>
-          <p className="page-hero-sub">Türkiye'de en yaygın araç markalarına ait kronik arıza veritabanı</p>
+          <div className="page-hero-badge"><Editable value={m.heroBadge || 'Araç Markaları'} path={['markalar', 'heroBadge']} /></div>
+          <h1 className="page-hero-title"><Editable value={m.heroTitle || 'Tüm Markalar'} path={['markalar', 'heroTitle']} /></h1>
+          <p className="page-hero-sub"><Editable value={m.heroSub || ''} path={['markalar', 'heroSub']} multiline /></p>
           <div className="page-hero-stats">
-            <div className="ph-stat"><span>{brands.length}</span><label>Marka</label></div>
-            <div className="ph-stat"><span>{data.length}</span><label>Arıza Kaydı</label></div>
-            <div className="ph-stat"><span>{fmt(totalReports)}</span><label>Toplam Doğrulama</label></div>
+            <div className="ph-stat"><span>{brands.length}</span><label><Editable value={m.statBrands || 'Marka'} path={['markalar', 'statBrands']} /></label></div>
+            <div className="ph-stat"><span>{data.length}</span><label><Editable value={m.statFaults || 'Arıza Kaydı'} path={['markalar', 'statFaults']} /></label></div>
+            <div className="ph-stat"><span>{fmt(totalReports)}</span><label><Editable value={m.statReports || 'Toplam Doğrulama'} path={['markalar', 'statReports']} /></label></div>
           </div>
         </div>
       </div>
@@ -57,7 +59,7 @@ export function MarkalarlPage({ data, onBrandSelect }) {
                 <p className="brand-card-sub">{s.count} kronik arıza kaydı</p>
                 <div className="brand-card-row">
                   <span className="brand-stat-chip">{fmt(s.reports)} doğrulama</span>
-                  {riskRatio >= 50 && <span className="brand-risk-chip">⚠ %{riskRatio} yüksek risk</span>}
+                  {riskRatio >= 50 && <span className="brand-risk-chip">%{riskRatio} yüksek risk</span>}
                 </div>
               </div>
               <div className="brand-card-right">
@@ -74,26 +76,27 @@ export function MarkalarlPage({ data, onBrandSelect }) {
 }
 
 // ── USTA YORUMLARI ────────────────────────────────────────────────────────────
-export function UzmanPage({ data, onModelClick }) {
+export function UzmanPage({ data, content, onModelClick }) {
+  const u = content?.uzman || {};
   const top = useMemo(() =>
     [...data].sort((a, b) => b.reportCount - a.reportCount), [data]);
 
   const totalReports = data.reduce((s, f) => s + f.reportCount, 0);
   const highRisk = data.filter(f => f.risk === 'YÜKSEK').length;
 
-  const MEDALS = ['🥇', '🥈', '🥉'];
+  const MEDALS = ['1.', '2.', '3.'];
 
   return (
     <div className="page-view">
-      <div className="page-hero" style={{ background: 'linear-gradient(135deg, #0A0A0A 0%, #1A1F35 60%, #0D1117 100%)' }}>
+      <div className="page-hero" style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)' }}>
         <div className="page-hero-content">
-          <div className="page-hero-badge">🔍 Topluluk Doğrulaması</div>
-          <h1 className="page-hero-title">En Çok Doğrulanan Arızalar</h1>
-          <p className="page-hero-sub">Binlerce araç sahibi tarafından raporlanmış ve doğrulanmış kronik arızalar</p>
+          <div className="page-hero-badge"><Editable value={u.heroBadge || 'Topluluk Doğrulaması'} path={['uzman', 'heroBadge']} /></div>
+          <h1 className="page-hero-title"><Editable value={u.heroTitle || 'En Çok Doğrulanan Arızalar'} path={['uzman', 'heroTitle']} /></h1>
+          <p className="page-hero-sub"><Editable value={u.heroSub || ''} path={['uzman', 'heroSub']} multiline /></p>
           <div className="page-hero-stats">
-            <div className="ph-stat"><span>{fmt(totalReports)}</span><label>Toplam Doğrulama</label></div>
-            <div className="ph-stat"><span>{data.length}</span><label>Kayıtlı Arıza</label></div>
-            <div className="ph-stat"><span>{highRisk}</span><label>Yüksek Riskli</label></div>
+            <div className="ph-stat"><span>{fmt(totalReports)}</span><label><Editable value={u.statReports || 'Toplam Doğrulama'} path={['uzman', 'statReports']} /></label></div>
+            <div className="ph-stat"><span>{data.length}</span><label><Editable value={u.statFaults || 'Kayıtlı Arıza'} path={['uzman', 'statFaults']} /></label></div>
+            <div className="ph-stat"><span>{highRisk}</span><label><Editable value={u.statHighRisk || 'Yüksek Riskli'} path={['uzman', 'statHighRisk']} /></label></div>
           </div>
         </div>
       </div>
@@ -111,9 +114,9 @@ export function UzmanPage({ data, onModelClick }) {
               </div>
               <p className="uzman-fault">{fault.description}</p>
               <div className="uzman-meta">
-                <span>📍 {fault.category}</span>
-                <span>🔧 {fault.kmDisplay}</span>
-                <span>💰 ₺{fmt(fault.costMin)} – ₺{fmt(fault.costMax)}</span>
+                <span className="uzman-meta-item"><span className="meta-lbl">Kategori:</span> {fault.category}</span>
+                <span className="uzman-meta-item"><span className="meta-lbl">Kilometre:</span> {fault.kmDisplay}</span>
+                <span className="uzman-meta-item"><span className="meta-lbl">Masraf:</span> ₺{fmt(fault.costMin)} – ₺{fmt(fault.costMax)}</span>
               </div>
             </div>
             <div className="uzman-reports">
@@ -131,13 +134,19 @@ export function UzmanPage({ data, onModelClick }) {
 }
 
 // ── MASRAF REHBERİ ────────────────────────────────────────────────────────────
-export function MasrafPage({ data, onModelClick }) {
+export function MasrafPage({ data, content, onModelClick }) {
+  const ms = content?.masraf || {};
   const sorted = useMemo(() => [...data].sort((a, b) => b.avgCost - a.avgCost), [data]);
 
+  const tierDefs = ms.tiers || [
+    { label: 'Yüksek Masraflı Onarımlar', sub: '₺30.000 ve üzeri', min: 30000, max: null },
+    { label: 'Orta Masraflı Onarımlar', sub: '₺10.000 – ₺30.000', min: 10000, max: 30000 },
+    { label: 'Düşük Masraflı Onarımlar', sub: '₺10.000 altı', min: 0, max: 10000 },
+  ];
   const tiers = [
-    { key: 'high',   label: '🔴 Pahalı Onarımlar',   sub: '₺30.000 ve üzeri',  faults: sorted.filter(f => f.avgCost >= 30000), color: '#DC2626', bg: '#FEF2F2' },
-    { key: 'mid',    label: '🟠 Orta Masraflı',        sub: '₺10.000 – ₺30.000', faults: sorted.filter(f => f.avgCost >= 10000 && f.avgCost < 30000), color: '#D97706', bg: '#FFFBEB' },
-    { key: 'low',    label: '🟢 Ekonomik Onarımlar',   sub: '₺10.000 altı',      faults: sorted.filter(f => f.avgCost < 10000), color: '#16A34A', bg: '#F0FDF4' },
+    { key: 'high', label: tierDefs[0]?.label, sub: tierDefs[0]?.sub, tierIdx: 0, faults: sorted.filter(f => f.avgCost >= 30000), color: '#DC2626' },
+    { key: 'mid', label: tierDefs[1]?.label, sub: tierDefs[1]?.sub, tierIdx: 1, faults: sorted.filter(f => f.avgCost >= 10000 && f.avgCost < 30000), color: '#D97706' },
+    { key: 'low', label: tierDefs[2]?.label, sub: tierDefs[2]?.sub, tierIdx: 2, faults: sorted.filter(f => f.avgCost < 10000), color: '#16A34A' },
   ];
 
   const avgCost = Math.round(data.reduce((s, f) => s + f.avgCost, 0) / data.length);
@@ -145,15 +154,15 @@ export function MasrafPage({ data, onModelClick }) {
 
   return (
     <div className="page-view">
-      <div className="page-hero" style={{ background: 'linear-gradient(135deg, #0A0A0A 0%, #1A2A1A 60%, #0A1A0A 100%)' }}>
+      <div className="page-hero" style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)' }}>
         <div className="page-hero-content">
-          <div className="page-hero-badge">💰 Maliyet Analizi</div>
-          <h1 className="page-hero-title">Masraf Rehberi</h1>
-          <p className="page-hero-sub">Araç arızalarının tahmini onarım maliyetleri ve maliyet analizi</p>
+          <div className="page-hero-badge"><Editable value={ms.heroBadge || 'Maliyet Analizi'} path={['masraf', 'heroBadge']} /></div>
+          <h1 className="page-hero-title"><Editable value={ms.heroTitle || 'Masraf Rehberi'} path={['masraf', 'heroTitle']} /></h1>
+          <p className="page-hero-sub"><Editable value={ms.heroSub || ''} path={['masraf', 'heroSub']} multiline /></p>
           <div className="page-hero-stats">
-            <div className="ph-stat"><span>₺{fmt(avgCost)}</span><label>Ortalama Masraf</label></div>
-            <div className="ph-stat"><span>₺{fmt(maxCost)}</span><label>En Yüksek</label></div>
-            <div className="ph-stat"><span>{data.length}</span><label>Arıza Kaydı</label></div>
+            <div className="ph-stat"><span>₺{fmt(avgCost)}</span><label><Editable value={ms.statAvg || 'Ortalama Masraf'} path={['masraf', 'statAvg']} /></label></div>
+            <div className="ph-stat"><span>₺{fmt(maxCost)}</span><label><Editable value={ms.statMax || 'En Yüksek'} path={['masraf', 'statMax']} /></label></div>
+            <div className="ph-stat"><span>{data.length}</span><label><Editable value={ms.statFaults || 'Arıza Kaydı'} path={['masraf', 'statFaults']} /></label></div>
           </div>
         </div>
       </div>
@@ -162,8 +171,12 @@ export function MasrafPage({ data, onModelClick }) {
         {tiers.map(tier => (
           <div key={tier.key} className="masraf-tier">
             <div className="masraf-tier-header" style={{ borderColor: tier.color }}>
-              <h2 className="masraf-tier-title">{tier.label}</h2>
-              <span className="masraf-tier-sub">{tier.sub}</span>
+              <h2 className="masraf-tier-title">
+                <Editable value={tier.label} path={['masraf', 'tiers', tier.tierIdx, 'label']} />
+              </h2>
+              <span className="masraf-tier-sub">
+                <Editable value={tier.sub} path={['masraf', 'tiers', tier.tierIdx, 'sub']} />
+              </span>
               <span className="masraf-tier-count" style={{ background: tier.color }}>{tier.faults.length} arıza</span>
             </div>
             <div className="masraf-tier-list">

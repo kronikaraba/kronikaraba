@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { hashPassword } from './adminStorage.js';
 
 const USERS_KEY = 'ka_users';
 const SESSION_KEY = 'ka_session';
@@ -8,37 +9,74 @@ export function loadUser() {
 }
 
 function getUsers() {
-  try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; } catch { return []; }
+  try {
+    const stored = JSON.parse(localStorage.getItem(USERS_KEY));
+    if (!stored || !Array.isArray(stored) || stored.length === 0) {
+      const defaultUsers = [
+        { id: 'u-seed-1', username: 'test_user', email: 'test@test.com', password: 'testpassword' }
+      ];
+      localStorage.setItem(USERS_KEY, JSON.stringify(defaultUsers));
+      return defaultUsers;
+    }
+    return stored;
+  } catch {
+    return [{ id: 'u-seed-1', username: 'test_user', email: 'test@test.com', password: 'testpassword' }];
+  }
 }
 
 function saveUsers(users) {
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
 }
 
-export function AuthModal({ onClose, onLogin, defaultTab = 'login' }) {
+export function AuthModal({ onClose, onLogin, onAdminLogin, defaultTab = 'login' }) {
   const [tab, setTab] = useState(defaultTab);
   const [form, setForm] = useState({ username: '', email: '', password: '' });
   const [error, setError] = useState('');
   const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setError(''); };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
+    const inputIdentifier = form.email.trim();
+    const inputPassword = form.password;
+
+    if (onAdminLogin && (inputIdentifier === 'admin' || inputIdentifier === 'admin@kronikaraba.com')) {
+      const success = await onAdminLogin(inputIdentifier, inputPassword);
+      if (success) {
+        onClose();
+        return;
+      }
+    }
+
     const users = getUsers();
-    const user = users.find(u => u.email === form.email && u.password === form.password);
-    if (!user) { setError('E-posta veya şifre hatalı.'); return; }
+    const hashedInputPassword = await hashPassword(inputPassword);
+    let user = users.find(u => (u.email === inputIdentifier || u.username === inputIdentifier) && u.password === hashedInputPassword);
+    
+    if (!user) {
+      // Try to find user with plaintext password for backward compatibility (migration)
+      const plainUser = users.find(u => (u.email === inputIdentifier || u.username === inputIdentifier) && u.password === inputPassword);
+      if (plainUser) {
+        // Migrate to hashed password
+        plainUser.password = hashedInputPassword;
+        saveUsers(users);
+        user = plainUser;
+      }
+    }
+
+    if (!user) { setError('Kullanıcı adı/E-posta veya şifre hatalı.'); return; }
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
     onLogin(user);
     onClose();
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     if (form.username.length < 3) { setError('Kullanıcı adı en az 3 karakter olmalı.'); return; }
     if (!form.email.includes('@')) { setError('Geçerli bir e-posta girin.'); return; }
     if (form.password.length < 6) { setError('Şifre en az 6 karakter olmalı.'); return; }
     const users = getUsers();
     if (users.find(u => u.email === form.email)) { setError('Bu e-posta zaten kayıtlı.'); return; }
-    const user = { id: Date.now().toString(), username: form.username, email: form.email, password: form.password };
+    const hashedPassword = await hashPassword(form.password);
+    const user = { id: Date.now().toString(), username: form.username, email: form.email, password: hashedPassword };
     saveUsers([...users, user]);
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
     onLogin(user);
@@ -76,8 +114,8 @@ export function AuthModal({ onClose, onLogin, defaultTab = 'login' }) {
             )}
 
             <div className="form-group">
-              <label htmlFor="auth-email">E-posta</label>
-              <input id="auth-email" type="email" placeholder="ornek@email.com" value={form.email} onChange={e => set('email', e.target.value)} required />
+              <label htmlFor="auth-email">{tab === 'login' ? 'Kullanıcı Adı veya E-posta' : 'E-posta'}</label>
+              <input id="auth-email" type={tab === 'login' ? 'text' : 'email'} placeholder={tab === 'login' ? 'örn. admin veya ornek@email.com' : 'ornek@email.com'} value={form.email} onChange={e => set('email', e.target.value)} required />
             </div>
 
             <div className="form-group">

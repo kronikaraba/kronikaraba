@@ -1,0 +1,26 @@
+==================================================
+KRONİK ARIZA PORTALI - TEST HESAPLARI VE GİRİŞ BİLGİLERİ
+==================================================
+
+1. YÖNETİCİ (ADMIN) GİRİŞ BİLGİLERİ:
+----------------------------------
+Kullanıcı Adı veya E-posta : admin (veya admin@kronikaraba.com)
+Şifre                      : admin123
+
+Not: Yönetici olarak giriş yaptığınızda sitenin alt kısmındaki yönetim paneli (Önizleme/Yönetim/Düzenle/Çıkış barı) aktif olur. Buradan arıza kayıtlarını düzenleyebilir, onay bekleyen kayıtları inceleyebilir, yeni markalar/modeller ekleyebilirsiniz.
+
+
+2. STANDART KULLANICI TEST HESABI:
+---------------------------------
+E-posta (veya Kullanıcı Adı) : test@test.com (veya test_user)
+Şifre                        : testpassword
+
+Not: Bu hesapla giriş yaptığınızda yorum yazabilir, usta tavsiyeleri ekleyebilir ve arızaları doğrulayabilirsiniz.
+
+
+3. YENİ HESAP OLUŞTURMA:
+-----------------------
+Ayrıca kendi belirleyeceğiniz başka bir test hesabı oluşturmak isterseniz:
+- Sitedeki "Üye Ol" sekmesine tıklayın.
+- Dilediğiniz kullanıcı adı, e-posta ve en az 6 karakterli şifreyi girip kayıt olun.
+- Kayıt edilen hesaplar tarayıcınızın yerel depolama alanında (localStorage) güvenli bir şekilde saklanır.
