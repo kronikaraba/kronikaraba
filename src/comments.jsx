@@ -273,7 +273,7 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
 
   const [open, setOpen] = useState(alwaysOpenProp || adminMode || false);
   const [newText, setNewText] = useState('');
-  const [newType, setNewType] = useState('yorum');
+  const [newType, setNewType] = useState(() => (adminModeProp ? 'usta' : 'yorum'));
   const [isUsta, setIsUsta] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const [editPost, setEditPost] = useState(null);   // { postId, replyId?, text, isReply }
@@ -505,7 +505,7 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
           )}
 
           {adminMode && (
-            <p className="forum-admin-hint">🛡 Yönetici modu — Tüm konuları ve yanıtları düzenleyebilir, silebilirsiniz.</p>
+            <p className="forum-admin-hint">Yönetici olarak yazdığınız gönderiler anında yayınlanır.</p>
           )}
 
           {(user || adminMode) ? (
@@ -518,33 +518,38 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
                 </div>
                 <span className="forum-new-label">
                   {adminMode ? (
-                    <><span style={{color:'var(--yellow)', fontWeight:800}}>🛡 {getAdminUsername()}</span> olarak konu aç</>
+                    <><span className="forum-admin-name">🛡 {getAdminUsername()}</span> — tartışmaya yaz</>
                   ) : 'Katkıda bulun'}
                 </span>
               </div>
-              <div className="forum-type-row">
-                {POST_TYPES.map(t => (
-                  <button
-                    key={t.value}
-                    type="button"
-                    className={`forum-type-btn${newType === t.value ? ' active' : ''}`}
-                    onClick={() => setNewType(t.value)}
-                    title={t.desc}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-              {newType === 'usta' && (
-                <label className="forum-usta-check">
-                  <input type="checkbox" checked={isUsta} onChange={e => setIsUsta(e.target.checked)} />
-                  Usta/teknisyen olduğumu onaylıyorum
-                </label>
+              {!adminMode && (
+                <>
+                  <div className="forum-type-row">
+                    {POST_TYPES.map(t => (
+                      <button
+                        key={t.value}
+                        type="button"
+                        className={`forum-type-btn${newType === t.value ? ' active' : ''}`}
+                        onClick={() => setNewType(t.value)}
+                        title={t.desc}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  {newType === 'usta' && (
+                    <label className="forum-usta-check">
+                      <input type="checkbox" checked={isUsta} onChange={e => setIsUsta(e.target.checked)} />
+                      Usta/teknisyen olduğumu onaylıyorum
+                    </label>
+                  )}
+                </>
               )}
               <textarea
                 className="forum-textarea"
                 placeholder={
-                  newType === 'usta' ? 'Mesleki deneyiminizi ve önerinizi yazın…'
+                  adminMode ? 'Usta görüşü veya bilgilendirme metni…'
+                  : newType === 'usta' ? 'Mesleki deneyiminizi ve önerinizi yazın…'
                   : newType === 'oneri' ? 'Çözüm önerinizi açıklayın…'
                   : newType === 'soru' ? 'Sorunuzu detaylı açıklayın…'
                   : 'Deneyiminizi paylaşın…'
@@ -557,7 +562,7 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
               <div className="forum-new-footer">
                 <span className="forum-char-count">{newText.length}/600</span>
                 <button type="submit" className="forum-submit-btn" disabled={!newText.trim()}>
-                  Gönder
+                  {adminMode ? 'Yayınla' : 'Gönder'}
                 </button>
               </div>
             </form>

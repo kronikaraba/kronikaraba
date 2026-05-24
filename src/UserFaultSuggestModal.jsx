@@ -1,13 +1,15 @@
 import { useState, useMemo } from 'react';
 import { loadCategories, loadMotorTypes } from './siteContent.js';
 import { savePending, loadPending } from './adminStorage.js';
+import { normalizeFault } from './faultUtils.js';
 
 const EMPTY = {
   brand: '', model: '', fault: '', symptoms: '', category: 'Motor', motorType: 'Benzin',
   year: '', risk: 'ORTA',
 };
 
-export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubmit }) {
+export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubmit, onDirectPublish }) {
+  const isAdminUser = user?.isAdmin === true;
   const [form, setForm] = useState(EMPTY);
   const [submitted, setSubmitted] = useState(false);
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -19,24 +21,31 @@ export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubm
     e.preventDefault();
     if (!form.brand.trim() || !form.model.trim() || !form.fault.trim()) return;
 
-    const pending = loadPending();
-    const newFault = {
+    const draft = normalizeFault({
       ...form,
       id: Date.now(),
-      description: form.fault,
-      yearMin: Number(form.year?.split('-')[0]) || 2020,
-      yearMax: Number(form.year?.split('-')[1]) || 2025,
+      fault: form.fault.trim(),
+      year: form.year,
       costMin: 0,
       costMax: 0,
-      avgCost: 0,
-      kmDisplay: 'Bilinmiyor',
-      kmMin: 0,
-      reportCount: 1,
+      kmDisplay: '',
       checkTip: '',
-      suggestedBy: user?.username || 'Anonim',
-      suggestedAt: new Date().toISOString(),
-    };
-    savePending([...pending, newFault]);
+      symptoms: form.symptoms,
+    });
+
+    if (isAdminUser && onDirectPublish) {
+      onDirectPublish(draft);
+      onClose();
+      return;
+    }
+
+    const pending = loadPending();
+    savePending([...pending, {
+      ...draft,
+      _pendingId: `p-${Date.now()}`,
+      _submittedBy: user?.username || 'Anonim',
+      _submittedAt: new Date().toLocaleDateString('tr-TR'),
+    }]);
     setSubmitted(true);
     if (onSubmit) onSubmit();
   };
@@ -71,12 +80,14 @@ export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubm
           <h2>🚗 Arıza Bildir</h2>
           <button className="modal-close" onClick={onClose} aria-label="Kapat">×</button>
         </div>
-        <div className="suggest-info-banner">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-          </svg>
-          <span>Öneriniz admin onayından sonra yayınlanacaktır.</span>
-        </div>
+        {!isAdminUser && (
+          <div className="suggest-info-banner">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <span>Öneriniz admin onayından sonra yayınlanacaktır.</span>
+          </div>
+        )}
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
             <div className="form-row">

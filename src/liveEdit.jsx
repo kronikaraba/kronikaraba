@@ -142,9 +142,9 @@ function LiveEditToolbar({ editMode, pendingCount, onToggle, onLogout, onNewFaul
           <div className="live-edit-quick">
             <button type="button" className="live-edit-btn live-edit-btn-sm" onClick={onNewFault}>+ Arıza</button>
             <button type="button" className="live-edit-btn live-edit-btn-sm" onClick={onNewModel}>+ Model</button>
-            <button type="button" className="live-edit-btn live-edit-btn-sm" onClick={() => onOpenHub('forum')}>💬 Konular</button>
+            <button type="button" className="live-edit-btn live-edit-btn-sm" onClick={() => onOpenHub('forum')}>💬 Tartışma</button>
             <button type="button" className="live-edit-btn live-edit-btn-sm" onClick={() => onOpenHub('pending')}>
-              ⏳ Onaylar{pendingCount > 0 ? ` (${pendingCount})` : ''}
+              📥 Öneriler{pendingCount > 0 ? ` (${pendingCount})` : ''}
             </button>
             <button type="button" className="live-edit-btn live-edit-btn-sm" onClick={() => onOpenHub('categories')}>🏷️</button>
           </div>

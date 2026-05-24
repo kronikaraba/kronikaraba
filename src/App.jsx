@@ -5,7 +5,8 @@ import { AuthModal, loadUser, logout } from './auth.jsx';
 import { CommentSection, getCommentCount, buildCommentCountMap } from './comments.jsx';
 import ModelDetailPage from './ModelDetailPage.jsx';
 import FaultDetailPage from './FaultDetailPage.jsx';
-import { loadAdminFaults, saveAdminFaults, loadAdminModels, saveAdminModels } from './adminStorage.js';
+import { loadAdminFaults, saveAdminFaults, loadAdminModels, saveAdminModels, loadPending, savePending } from './adminStorage.js';
+import { normalizeFault, getPendingId } from './faultUtils.js';
 import { LiveEditProvider, Editable, useLiveEdit } from './liveEdit.jsx';
 import FaultEditModal from './faultEditModal.jsx';
 import ModelEditModal from './modelEditModal.jsx';
@@ -73,18 +74,18 @@ function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, o
           />
         </div>
         {authed ? (
-          editMode ? (
-            <span className="navbar-btn navbar-btn-edit-only">
-              <Editable value={nb.addBtnText} path={['navbar', 'addBtnText']} />
+          <button id="btn-ariza-ekle" className="navbar-btn" onClick={onAdd} type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span className="btn-label">
+              {editMode ? (
+                <Editable value={nb.addBtnText} path={['navbar', 'addBtnText']} />
+              ) : (
+                nb.addBtnText
+              )}
             </span>
-          ) : (
-            <button id="btn-ariza-ekle" className="navbar-btn" onClick={onAdd}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              <span className="btn-label">{nb.addBtnText}</span>
-            </button>
-          )
+          </button>
         ) : (
           <button id="btn-ariza-ekle-user" className="navbar-btn" onClick={onSuggest}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
@@ -611,6 +612,11 @@ function AppContent() {
   const adminMode = authed && editMode;
 
   const openSuggest = () => {
+    // Yönetici: doğrudan yayınla; onay kuyruğuna gönderme
+    if (authed || user?.isAdmin) {
+      setEditFault('new');
+      return;
+    }
     if (!user) { openAuth('login'); return; }
     setSuggestOpen(true);
   };
@@ -720,16 +726,22 @@ function AppContent() {
   }, [data]);
 
   const handleSaveFault = (fault) => {
-    const idx = data.findIndex(f => f.id === fault.id);
+    const pendingId = fault._pendingId;
+    const normalized = normalizeFault(fault);
+    const idx = data.findIndex(f => f.id === normalized.id);
     const next = idx >= 0
-      ? data.map((f, i) => (i === idx ? fault : f))
-      : [fault, ...data];
+      ? data.map((f, i) => (i === idx ? normalized : f))
+      : [normalized, ...data];
     persistFaults(next);
-    setEditFault(null);
-    if (selectedFault && selectedFault.id === fault.id) {
-      setSelectedFault(fault);
+    if (pendingId) {
+      savePending(loadPending().filter(p => getPendingId(p) !== pendingId));
+      refreshPending();
     }
-    setToast('Arıza kaydedildi!');
+    setEditFault(null);
+    if (selectedFault && selectedFault.id === normalized.id) {
+      setSelectedFault(normalized);
+    }
+    setToast(pendingId ? 'Öneri yayınlandı!' : 'Arıza kaydedildi!');
   };
 
   const handleDeleteFault = (id) => {
@@ -742,7 +754,9 @@ function AppContent() {
   };
 
   const handleApprovePending = (fault) => {
-    persistFaults([fault, ...data]);
+    const normalized = normalizeFault(fault);
+    const exists = data.some(f => f.id === normalized.id);
+    persistFaults(exists ? data.map(f => (f.id === normalized.id ? normalized : f)) : [normalized, ...data]);
     refreshPending();
   };
 
@@ -1033,6 +1047,7 @@ function AppContent() {
             refreshPending();
             setToast('Arıza öneriniz gönderildi! Admin onayı bekleniyor.');
           }}
+          onDirectPublish={handleSaveFault}
         />
       )}
     </>
