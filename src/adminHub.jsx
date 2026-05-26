@@ -267,7 +267,10 @@ export default function AdminHub({
                         <span className="admin-hub-meta">{p.username} · {p.date}</span>
                       </div>
                       <p className="admin-hub-fault-ref" title={p.faultTitle || p.faultLabel}>{p.faultLabel}</p>
-                      <p>{p.text}</p>
+                      {p.text ? <p>{p.text}</p> : null}
+                      {(p.images?.length > 0) && (
+                        <p className="admin-hub-meta">📷 {p.images.length} fotoğraf</p>
+                      )}
                       <div className="admin-hub-card-actions">
                         <button
                           type="button"

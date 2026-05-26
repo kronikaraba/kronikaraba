@@ -611,6 +611,75 @@ function AppContent() {
   const PAGE_SIZE = 20;
   const adminMode = authed && editMode;
 
+  // ── Browser history helpers ────────────────────────────────────────────────
+  const skipPushRef = useRef(false); // flag to skip pushState during popstate handling
+
+  const buildNavState = useCallback(() => ({
+    activeView,
+    selectedModel,
+    selectedFaultId: selectedFault?.id || null,
+    forceExplorer,
+    search,
+    filters,
+  }), [activeView, selectedModel, selectedFault, forceExplorer, search, filters]);
+
+  // Push a new history entry whenever a meaningful navigation happens
+  const pushNav = useCallback((overrides = {}) => {
+    if (skipPushRef.current) return;
+    const state = {
+      activeView: overrides.activeView ?? activeView,
+      selectedModel: overrides.selectedModel !== undefined ? overrides.selectedModel : selectedModel,
+      selectedFaultId: overrides.selectedFaultId !== undefined ? overrides.selectedFaultId : (selectedFault?.id || null),
+      forceExplorer: overrides.forceExplorer !== undefined ? overrides.forceExplorer : forceExplorer,
+      search: overrides.search !== undefined ? overrides.search : search,
+      filters: overrides.filters !== undefined ? overrides.filters : filters,
+    };
+    window.history.pushState(state, '');
+  }, [activeView, selectedModel, selectedFault, forceExplorer, search, filters]);
+
+  // Replace initial history entry so back from first page works
+  useEffect(() => {
+    window.history.replaceState(buildNavState(), '');
+  }, []); // only on mount
+
+  // Listen for browser back/forward
+  useEffect(() => {
+    const handlePopState = (e) => {
+      const s = e.state;
+      if (!s) {
+        // No state = initial page, go to landing
+        skipPushRef.current = true;
+        setActiveView('home');
+        setSelectedModel(null);
+        setSelectedFault(null);
+        setForceExplorer(false);
+        setSearch('');
+        setFilters({ brand: '', model: '', yearMin: '', yearMax: '', motorType: '', kmMin: '', category: '', costMin: '', costMax: '', risk: '', minReports: '' });
+        skipPushRef.current = false;
+        return;
+      }
+      skipPushRef.current = true;
+      setActiveView(s.activeView || 'home');
+      setSelectedModel(s.selectedModel || null);
+      // Restore selectedFault from ID
+      if (s.selectedFaultId) {
+        setSelectedFault(prev => {
+          // Try to find fault from current data
+          const found = data.find(f => f.id === s.selectedFaultId);
+          return found || prev;
+        });
+      } else {
+        setSelectedFault(null);
+      }
+      setForceExplorer(s.forceExplorer || false);
+      setSearch(s.search || '');
+      if (s.filters) setFilters(s.filters);
+      skipPushRef.current = false;
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [data]);
+
   const openSuggest = () => {
     // Yönetici: doğrudan yayınla; onay kuyruğuna gönderme
     if (authed || user?.isAdmin) {
@@ -656,20 +725,25 @@ function AppContent() {
     setSelectedModel(null);
     setSelectedFault(null);
     setSidebarOpen(false);
+    const emptyFilters = { brand: '', model: '', yearMin: '', yearMax: '', motorType: '', kmMin: '', category: '', costMin: '', costMax: '', risk: '', minReports: '' };
     if (action === 'reset') {
       setActiveView('home');
       setSearch('');
-      setFilters({ brand: '', model: '', yearMin: '', yearMax: '', motorType: '', kmMin: '', category: '', costMin: '', costMax: '', risk: '', minReports: '' });
+      setFilters(emptyFilters);
       setSort('reports-desc');
       setForceExplorer(false);
+      pushNav({ activeView: 'home', selectedModel: null, selectedFaultId: null, forceExplorer: false, search: '', filters: emptyFilters });
     } else if (action === 'brands') {
       setActiveView('markalar');
+      pushNav({ activeView: 'markalar', selectedModel: null, selectedFaultId: null });
     } else if (action === 'uzman') {
       setActiveView('uzman');
+      pushNav({ activeView: 'uzman', selectedModel: null, selectedFaultId: null });
     } else if (action === 'masraf') {
       setActiveView('masraf');
+      pushNav({ activeView: 'masraf', selectedModel: null, selectedFaultId: null });
     }
-  }, []);
+  }, [pushNav]);
 
   const goHome = () => {
     handleNavAction('reset');
@@ -777,7 +851,7 @@ function AppContent() {
     <>
       <Navbar
         content={content}
-        search={search} onSearch={(v) => { setSearch(v); setSelectedModel(null); setSelectedFault(null); setActiveView('home'); }}
+        search={search} onSearch={(v) => { setSearch(v); setSelectedModel(null); setSelectedFault(null); setActiveView('home'); if (v) pushNav({ activeView: 'home', selectedModel: null, selectedFaultId: null, search: v }); }}
         onAdd={() => authed && setEditFault('new')}
         user={user} onLogin={() => openAuth('login')} onRegister={() => openAuth('register')} onLogout={handleLogout}
         onMenuToggle={() => setSidebarOpen(o => !o)}
@@ -810,10 +884,11 @@ function AppContent() {
               fault={selectedFault}
               user={user}
               onAuthRequest={() => openAuth('login')}
-              onBack={() => setSelectedFault(null)}
+              onBack={() => { setSelectedFault(null); pushNav({ selectedFaultId: null }); }}
               onModelClick={(modelName) => {
                 setSelectedFault(null);
                 setSelectedModel(modelName);
+                pushNav({ selectedFaultId: null, selectedModel: modelName });
               }}
               adminMode={adminMode}
               onEdit={setEditFault}
@@ -836,7 +911,7 @@ function AppContent() {
               models={models}
               faults={data}
               adminMode={adminMode}
-              onBack={() => setSelectedModel(null)}
+              onBack={() => { setSelectedModel(null); pushNav({ selectedModel: null }); }}
               onEditModel={(key, data) => setEditModel({ key, data })}
               onCreateModel={() => setEditModel({ key: selectedModel, data: null })}
               user={user}
@@ -852,7 +927,9 @@ function AppContent() {
               content={content}
               onBrandSelect={(brand) => {
                 setActiveView('home');
-                setFilters(f => ({ ...f, brand }));
+                const newFilters = { ...filters, brand };
+                setFilters(newFilters);
+                pushNav({ activeView: 'home', filters: newFilters });
               }}
             />
           </main>
@@ -860,13 +937,13 @@ function AppContent() {
       ) : activeView === 'uzman' ? (
         <div className="layout layout-detail">
           <main className="main main-detail" style={{ maxWidth: 1000 }}>
-            <UzmanPage data={data} content={content} onModelClick={setSelectedModel} />
+            <UzmanPage data={data} content={content} onModelClick={(m) => { setSelectedModel(m); pushNav({ selectedModel: m }); }} />
           </main>
         </div>
       ) : activeView === 'masraf' ? (
         <div className="layout layout-detail">
           <main className="main main-detail" style={{ maxWidth: 1000 }}>
-            <MasrafPage data={data} content={content} onModelClick={setSelectedModel} />
+            <MasrafPage data={data} content={content} onModelClick={(m) => { setSelectedModel(m); pushNav({ selectedModel: m }); }} />
           </main>
         </div>
       ) : showLanding ? (
@@ -875,16 +952,18 @@ function AppContent() {
             data={data}
             models={models}
             onBrandSelect={(brand) => {
-              setFilters(f => ({ ...f, brand }));
+              const newFilters = { ...filters, brand };
+              setFilters(newFilters);
               setForceExplorer(true);
+              pushNav({ forceExplorer: true, filters: newFilters });
             }}
-            onModelClick={setSelectedModel}
-            onFaultClick={setSelectedFault}
+            onModelClick={(m) => { setSelectedModel(m); pushNav({ selectedModel: m }); }}
+            onFaultClick={(f) => { setSelectedFault(f); pushNav({ selectedFaultId: f.id }); }}
             onSearch={(val) => {
               setSearch(val);
               if (val) setForceExplorer(true);
             }}
-            onExploreAll={() => setForceExplorer(true)}
+            onExploreAll={() => { setForceExplorer(true); pushNav({ forceExplorer: true }); }}
             onSuggestFault={openSuggest}
             content={content}
           />
@@ -954,10 +1033,10 @@ function AppContent() {
                       key={f.id} fault={f} user={user}
                       adminMode={adminMode}
                       onAuthRequest={() => openAuth('login')}
-                      onModelClick={setSelectedModel}
+                      onModelClick={(m) => { setSelectedModel(m); pushNav({ selectedModel: m }); }}
                       onEdit={setEditFault}
                       onDelete={handleDeleteFault}
-                      onClick={setSelectedFault}
+                      onClick={(f) => { setSelectedFault(f); pushNav({ selectedFaultId: f.id }); }}
                       commentCount={commentCountMap[f.id] || 0}
                     />
                   ))}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { loadForum, saveForum, getAdminUsername } from './adminStorage.js';
+import { ForumPostImages, ForumImageAttach } from './ForumImages.jsx';
 
 // ── Seed data — pre-filled forum posts per fault id ──────────────────────────
 const SEED = {
@@ -125,7 +126,8 @@ function ReplyItem({ reply, user, onVote, adminMode, onAdminDeleteReply, onAdmin
             </span>
           )}
         </div>
-        <p className="forum-text">{reply.text}</p>
+        {reply.text ? <p className="forum-text">{reply.text}</p> : null}
+        <ForumPostImages images={reply.images} />
         <button
           className={`forum-vote${voted ? ' voted' : ''}`}
           onClick={() => onVote(reply.id)}
@@ -144,15 +146,17 @@ function ReplyItem({ reply, user, onVote, adminMode, onAdminDeleteReply, onAdmin
 function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, adminMode, onAdminDelete, onAdminEdit, onAdminDeleteReply, onAdminEditReply }) {
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [replyImages, setReplyImages] = useState([]);
   const [showReplies, setShowReplies] = useState(true);
   const cfg = typeConfig(post.type);
   const voted = user && (post.voters || []).includes(user.id);
 
   const submitReply = (e) => {
     e.preventDefault();
-    if (!replyText.trim()) return;
-    onReply(post.id, replyText.trim());
+    if (!replyText.trim() && replyImages.length === 0) return;
+    onReply(post.id, { text: replyText.trim(), images: replyImages });
     setReplyText('');
+    setReplyImages([]);
     setShowReplyBox(false);
   };
 
@@ -179,7 +183,8 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
             {post.isUsta && <span className="usta-tag">Usta</span>}
             <span className="forum-date">{post.date}</span>
           </div>
-          <p className="forum-text">{post.text}</p>
+          {post.text ? <p className="forum-text">{post.text}</p> : null}
+          <ForumPostImages images={post.images} />
           <div className="forum-actions">
             <button
               className={`forum-vote${voted ? ' voted' : ''}`}
@@ -244,9 +249,16 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
                 maxLength={400}
                 autoFocus
               />
+              <ForumImageAttach images={replyImages} onChange={setReplyImages} />
               <div className="forum-reply-form-actions">
-                <button type="button" className="forum-cancel-btn" onClick={() => setShowReplyBox(false)}>İptal</button>
-                <button type="submit" className="forum-submit-btn">Yanıtla</button>
+                <button type="button" className="forum-cancel-btn" onClick={() => { setShowReplyBox(false); setReplyImages([]); }}>İptal</button>
+                <button
+                  type="submit"
+                  className="forum-submit-btn"
+                  disabled={!replyText.trim() && replyImages.length === 0}
+                >
+                  Yanıtla
+                </button>
               </div>
             </form>
           )}
@@ -273,6 +285,7 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
 
   const [open, setOpen] = useState(alwaysOpenProp || adminMode || false);
   const [newText, setNewText] = useState('');
+  const [newImages, setNewImages] = useState([]);
   const [newType, setNewType] = useState(() => (adminModeProp ? 'usta' : 'yorum'));
   const [isUsta, setIsUsta] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
@@ -350,7 +363,7 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
 
   const submitPost = (e) => {
     e.preventDefault();
-    if (!newText.trim()) return;
+    if (!newText.trim() && newImages.length === 0) return;
     const author = adminMode ? getAdminUsername() : user?.username;
     if (!author) { onAuthRequest(); return; }
     const post = {
@@ -359,6 +372,7 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
       username: author,
       isUsta: adminMode ? (newType === 'usta') : (newType === 'usta' ? true : isUsta),
       text: newText.trim(),
+      images: newImages.length ? newImages : undefined,
       date: new Date().toLocaleDateString('tr-TR'),
       helpful: 0,
       voters: [],
@@ -369,6 +383,7 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
       [faultId]: [post, ...(prev[faultId] || [])],
     }));
     setNewText('');
+    setNewImages([]);
     setIsUsta(false);
   };
 
@@ -400,14 +415,17 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
     });
   };
 
-  const addReply = (postId, text) => {
+  const addReply = (postId, payload) => {
     const author = adminMode ? getAdminUsername() : user?.username;
     if (!author) return;
+    const text = typeof payload === 'string' ? payload : (payload.text || '');
+    const images = typeof payload === 'string' ? undefined : (payload.images?.length ? payload.images : undefined);
     const reply = {
       id: `r-${Date.now()}`,
       username: author,
       isUsta: false,
       text,
+      images,
       date: new Date().toLocaleDateString('tr-TR'),
       helpful: 0,
       voters: [],
@@ -552,16 +570,21 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
                   : newType === 'usta' ? 'Mesleki deneyiminizi ve önerinizi yazın…'
                   : newType === 'oneri' ? 'Çözüm önerinizi açıklayın…'
                   : newType === 'soru' ? 'Sorunuzu detaylı açıklayın…'
-                  : 'Deneyiminizi paylaşın…'
+                  : 'Deneyiminizi paylaşın… (metin isteğe bağlı, fotoğraf ekleyebilirsiniz)'
                 }
                 value={newText}
                 onChange={e => setNewText(e.target.value)}
                 maxLength={600}
                 rows={3}
               />
+              <ForumImageAttach images={newImages} onChange={setNewImages} />
               <div className="forum-new-footer">
                 <span className="forum-char-count">{newText.length}/600</span>
-                <button type="submit" className="forum-submit-btn" disabled={!newText.trim()}>
+                <button
+                  type="submit"
+                  className="forum-submit-btn"
+                  disabled={!newText.trim() && newImages.length === 0}
+                >
                   {adminMode ? 'Yayınla' : 'Gönder'}
                 </button>
               </div>
