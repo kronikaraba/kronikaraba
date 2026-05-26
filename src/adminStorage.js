@@ -8,29 +8,53 @@ export const ADMIN_USER_KEY = 'ka_admin_username';
 const DEFAULT_PASS = 'admin123';
 const DEFAULT_USER = 'admin';
 
-// ── API Helpers ──────────────────────────────────────────────────────────────
+// ── API Helpers (with localStorage fallback) ─────────────────────────────────
 const API_BASE = '/api/data';
+const LS_PREFIX = 'ka_data_';
+
+function lsLoad(key) {
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + key);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function lsSave(key, data) {
+  try {
+    localStorage.setItem(LS_PREFIX + key, JSON.stringify(data));
+  } catch (err) {
+    console.error(`lsSave(${key}) failed:`, err);
+  }
+}
 
 async function apiLoad(key) {
   try {
     const res = await fetch(`${API_BASE}?key=${key}`);
-    if (!res.ok) return null;
-    return await res.json();
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    // Sync localStorage with API data so it stays fresh
+    if (data != null) lsSave(key, data);
+    return data;
   } catch (err) {
-    console.error(`apiLoad(${key}) failed:`, err);
-    return null;
+    console.warn(`apiLoad(${key}) failed, falling back to localStorage:`, err);
+    return lsLoad(key);
   }
 }
 
 async function apiSave(key, data) {
+  // Always save to localStorage first (instant persistence)
+  lsSave(key, data);
   try {
-    await fetch(API_BASE, {
+    const res = await fetch(API_BASE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, data }),
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return true;
   } catch (err) {
-    console.error(`apiSave(${key}) failed:`, err);
+    console.warn(`apiSave(${key}) failed, data saved to localStorage only:`, err);
+    return false;
   }
 }
 
