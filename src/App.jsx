@@ -665,38 +665,6 @@ function AppContent() {
   const PAGE_SIZE = 20;
   const adminMode = authed && editMode;
 
-  if (loading) {
-    return (
-      <div className="app-loading-screen" style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        background: 'var(--gray-50, #f9fafb)',
-        fontFamily: 'Inter, system-ui, sans-serif'
-      }}>
-        <div className="app-loading-spinner" style={{
-          width: '40px',
-          height: '40px',
-          border: '3px solid var(--gray-200, #e5e7eb)',
-          borderTopColor: 'var(--primary-600, #2563eb)',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite',
-          marginBottom: '16px'
-        }} />
-        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--gray-800, #1f2937)', margin: 0 }}>
-          KronikArıza yükleniyor...
-        </h2>
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
-      </div>
-    );
-  }
-
   // ── Browser history helpers ────────────────────────────────────────────────
   const skipPushRef = useRef(false); // flag to skip pushState during popstate handling
 
@@ -896,6 +864,39 @@ function AppContent() {
   const commentCountMap = useMemo(() => {
     return buildCommentCountMap(data.map(f => f.id), forum);
   }, [data, forum]);
+
+  // ── Loading screen (MUST be after all hooks to avoid Rules of Hooks violation) ──
+  if (loading) {
+    return (
+      <div className="app-loading-screen" style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: 'var(--gray-50, #f9fafb)',
+        fontFamily: 'Inter, system-ui, sans-serif'
+      }}>
+        <div className="app-loading-spinner" style={{
+          width: '40px',
+          height: '40px',
+          border: '3px solid var(--gray-200, #e5e7eb)',
+          borderTopColor: 'var(--primary-600, #2563eb)',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+          marginBottom: '16px'
+        }} />
+        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--gray-800, #1f2937)', margin: 0 }}>
+          KronikArıza yükleniyor...
+        </h2>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   const handleSaveFault = async (fault) => {
     const pendingId = fault._pendingId;
