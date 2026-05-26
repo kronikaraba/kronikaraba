@@ -1,8 +1,3 @@
-// ── Storage Keys ─────────────────────────────────────────────────────────────
-const CONTENT_KEY    = 'ka_site_content';
-const CATEGORIES_KEY = 'ka_categories';
-const MOTOR_KEY      = 'ka_motor_types';
-
 // ── Defaults ─────────────────────────────────────────────────────────────────
 export const defaultSiteContent = {
   navbar: {
@@ -83,35 +78,58 @@ function deepMerge(defaults, overrides) {
   return result;
 }
 
-// ── Site Content ─────────────────────────────────────────────────────────────
-export function loadSiteContent() {
+// ── API Helpers ───────────────────────────────────────────────────────────────
+const API_BASE = '/api/data';
+
+async function apiLoad(key) {
   try {
-    const stored = JSON.parse(localStorage.getItem(CONTENT_KEY));
-    if (!stored) return defaultSiteContent;
-    return deepMerge(defaultSiteContent, stored);
-  } catch { return defaultSiteContent; }
+    const res = await fetch(`${API_BASE}?key=${key}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
-export function saveSiteContent(data) {
-  localStorage.setItem(CONTENT_KEY, JSON.stringify(data));
+async function apiSave(key, data) {
+  try {
+    await fetch(API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, data }),
+    });
+  } catch (err) {
+    console.error(`apiSave(${key}) failed:`, err);
+  }
+}
+
+// ── Site Content ─────────────────────────────────────────────────────────────
+export async function loadSiteContent() {
+  const stored = await apiLoad('content');
+  if (!stored) return defaultSiteContent;
+  return deepMerge(defaultSiteContent, stored);
+}
+
+export async function saveSiteContent(data) {
+  return apiSave('content', data);
 }
 
 // ── Categories ────────────────────────────────────────────────────────────────
-export function loadCategories() {
-  try { return JSON.parse(localStorage.getItem(CATEGORIES_KEY)) || defaultCategories; }
-  catch { return defaultCategories; }
+export async function loadCategories() {
+  const data = await apiLoad('categories');
+  return data || defaultCategories;
 }
 
-export function saveCategories(data) {
-  localStorage.setItem(CATEGORIES_KEY, JSON.stringify(data));
+export async function saveCategories(data) {
+  return apiSave('categories', data);
 }
 
 // ── Motor Types ───────────────────────────────────────────────────────────────
-export function loadMotorTypes() {
-  try { return JSON.parse(localStorage.getItem(MOTOR_KEY)) || defaultMotorTypes; }
-  catch { return defaultMotorTypes; }
+export async function loadMotorTypes() {
+  const data = await apiLoad('motorTypes');
+  return data || defaultMotorTypes;
 }
 
-export function saveMotorTypes(data) {
-  localStorage.setItem(MOTOR_KEY, JSON.stringify(data));
+export async function saveMotorTypes(data) {
+  return apiSave('motorTypes', data);
 }

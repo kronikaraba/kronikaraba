@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useCallback } from 'react';
-import { loadSiteContent, saveSiteContent } from './siteContent.js';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { loadSiteContent, saveSiteContent, defaultSiteContent } from './siteContent.js';
 import { adminLogin, adminLogout, isAdmin as checkAdmin, loadPending } from './adminStorage.js';
 
 const LiveEditContext = createContext(null);
@@ -36,22 +36,33 @@ export function setContentPath(content, path, value) {
 }
 
 export function LiveEditProvider({ children }) {
-  const [content, setContent] = useState(() => loadSiteContent());
+  const [content, setContent] = useState(defaultSiteContent);
   const [authed, setAuthed] = useState(() => checkAdmin());
   const [editMode, setEditMode] = useState(false);
-  const [pendingCount, setPendingCount] = useState(() => loadPending().length);
+  const [pendingCount, setPendingCount] = useState(0);
   const [hubOpen, setHubOpen] = useState(false);
   const [hubTab, setHubTab] = useState('pending');
   const [adminCallbacks, setAdminCallbacks] = useState({});
 
-  const refreshPending = useCallback(() => {
-    setPendingCount(loadPending().length);
+  // Load site content from API on mount
+  useEffect(() => {
+    loadSiteContent().then(c => setContent(c));
   }, []);
+
+  // Async pending count refresh
+  const refreshPending = useCallback(() => {
+    loadPending().then(p => setPendingCount(p.length));
+  }, []);
+
+  // Initial pending load when authed
+  useEffect(() => {
+    if (authed) refreshPending();
+  }, [authed, refreshPending]);
 
   const updateField = useCallback((path, value) => {
     setContent(prev => {
       const next = setContentPath(prev, path, value);
-      saveSiteContent(next);
+      saveSiteContent(next); // async fire-and-forget
       return next;
     });
   }, []);

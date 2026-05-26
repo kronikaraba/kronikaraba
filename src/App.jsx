@@ -5,7 +5,7 @@ import { AuthModal, loadUser, logout } from './auth.jsx';
 import { CommentSection, getCommentCount, buildCommentCountMap } from './comments.jsx';
 import ModelDetailPage from './ModelDetailPage.jsx';
 import FaultDetailPage from './FaultDetailPage.jsx';
-import { loadAdminFaults, saveAdminFaults, loadAdminModels, saveAdminModels, loadPending, savePending } from './adminStorage.js';
+import { loadAdminFaults, saveAdminFaults, loadAdminModels, saveAdminModels, loadPending, savePending, loadForum } from './adminStorage.js';
 import { normalizeFault, getPendingId } from './faultUtils.js';
 import { LiveEditProvider, Editable, useLiveEdit } from './liveEdit.jsx';
 import FaultEditModal from './faultEditModal.jsx';
@@ -162,7 +162,7 @@ function FilterRow({ label, isOpen, onToggle, hasValue, children }) {
 }
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
-function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpenAdvanced, isMobile, onNavAction, activeView }) {
+function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpenAdvanced, isMobile, onNavAction, activeView, categories, motorTypes }) {
   const [open, setOpen] = useState({
     brand: false, category: false, motorType: false, risk: false
   });
@@ -182,8 +182,8 @@ function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpen
   };
 
   const brandList = useMemo(() => [...new Set(allData.map(f => f.brand))].sort(), [allData]);
-  const categoryList = useMemo(() => loadCategories(), []);
-  const motorTypeList = useMemo(() => loadMotorTypes(), []);
+  const categoryList = categories || [];
+  const motorTypeList = motorTypes || [];
 
   const brandCounts = useMemo(() => {
     const m = {}; allData.forEach(f => { m[f.brand] = (m[f.brand] || 0) + 1; }); return m;
@@ -587,8 +587,36 @@ function AppContent() {
     handleLogout: adminLogoutContext,
     loginAdmin,
   } = useLiveEdit();
-  const [data, setData] = useState(() => loadAdminFaults());
-  const [models, setModels] = useState(() => loadAdminModels());
+  const [data, setData] = useState([]);
+  const [models, setModels] = useState({});
+  const [categories, setCategories] = useState([]);
+  const [motorTypes, setMotorTypes] = useState([]);
+  const [forum, setForum] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function initAll() {
+      try {
+        const [loadedData, loadedModels, loadedCats, loadedMotors, loadedForum] = await Promise.all([
+          loadAdminFaults(),
+          loadAdminModels(),
+          loadCategories(),
+          loadMotorTypes(),
+          loadForum()
+        ]);
+        setData(loadedData);
+        setModels(loadedModels);
+        setCategories(loadedCats);
+        setMotorTypes(loadedMotors);
+        setForum(loadedForum);
+      } catch (err) {
+        console.error("Failed to load initial data", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    initAll();
+  }, []);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('reports-desc');
   const [filters, setFilters] = useState({
@@ -610,6 +638,38 @@ function AppContent() {
   const [visibleCount, setVisibleCount] = useState(20);
   const PAGE_SIZE = 20;
   const adminMode = authed && editMode;
+
+  if (loading) {
+    return (
+      <div className="app-loading-screen" style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: 'var(--gray-50, #f9fafb)',
+        fontFamily: 'Inter, system-ui, sans-serif'
+      }}>
+        <div className="app-loading-spinner" style={{
+          width: '40px',
+          height: '40px',
+          border: '3px solid var(--gray-200, #e5e7eb)',
+          borderTopColor: 'var(--primary-600, #2563eb)',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+          marginBottom: '16px'
+        }} />
+        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--gray-800, #1f2937)', margin: 0 }}>
+          KronikArıza yükleniyor...
+        </h2>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   // ── Browser history helpers ────────────────────────────────────────────────
   const skipPushRef = useRef(false); // flag to skip pushState during popstate handling
@@ -796,10 +856,10 @@ function AppContent() {
 
   // Build comment count map once (instead of per-card localStorage reads)
   const commentCountMap = useMemo(() => {
-    return buildCommentCountMap(data.map(f => f.id));
-  }, [data]);
+    return buildCommentCountMap(data.map(f => f.id), forum);
+  }, [data, forum]);
 
-  const handleSaveFault = (fault) => {
+  const handleSaveFault = async (fault) => {
     const pendingId = fault._pendingId;
     const normalized = normalizeFault(fault);
     const idx = data.findIndex(f => f.id === normalized.id);
@@ -808,8 +868,13 @@ function AppContent() {
       : [normalized, ...data];
     persistFaults(next);
     if (pendingId) {
-      savePending(loadPending().filter(p => getPendingId(p) !== pendingId));
-      refreshPending();
+      try {
+        const pendingList = await loadPending();
+        await savePending(pendingList.filter(p => getPendingId(p) !== pendingId));
+        refreshPending();
+      } catch (err) {
+        console.error("Failed to update pending suggestions", err);
+      }
     }
     setEditFault(null);
     if (selectedFault && selectedFault.id === normalized.id) {
@@ -872,6 +937,8 @@ function AppContent() {
         isMobile={true}
         onNavAction={handleNavAction}
         activeView={activeView}
+        categories={categories}
+        motorTypes={motorTypes}
       />
 
       {/* Sidebar overlay for mobile */}
@@ -970,7 +1037,11 @@ function AppContent() {
         </div>
       ) : (
         <div className="layout">
-          <Sidebar content={content} filters={filters} onFilters={setFilters} allData={data} onOpenAdvanced={() => setAdvancedOpen(true)} isMobile={false} />
+          <Sidebar
+            content={content} filters={filters} onFilters={setFilters} allData={data}
+            onOpenAdvanced={() => setAdvancedOpen(true)} isMobile={false}
+            categories={categories} motorTypes={motorTypes}
+          />
 
           <main className="main">
             <button className="mobile-filter-btn" onClick={() => setSidebarOpen(true)}>
@@ -1064,6 +1135,8 @@ function AppContent() {
           allFaults={data}
           onSave={handleSaveFault}
           onClose={() => setEditFault(null)}
+          categories={categories}
+          motorTypes={motorTypes}
         />
       )}
       {editModel && (
@@ -1127,6 +1200,8 @@ function AppContent() {
             setToast('Arıza öneriniz gönderildi! Admin onayı bekleniyor.');
           }}
           onDirectPublish={handleSaveFault}
+          categories={categories}
+          motorTypes={motorTypes}
         />
       )}
     </>

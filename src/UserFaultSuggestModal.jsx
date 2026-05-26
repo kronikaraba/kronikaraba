@@ -8,16 +8,16 @@ const EMPTY = {
   year: '', risk: 'ORTA',
 };
 
-export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubmit, onDirectPublish }) {
+export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubmit, onDirectPublish, categories, motorTypes }) {
   const isAdminUser = user?.isAdmin === true;
   const [form, setForm] = useState(EMPTY);
   const [submitted, setSubmitted] = useState(false);
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
-  const catOptions = useMemo(() => loadCategories(), []);
-  const motorOptions = useMemo(() => loadMotorTypes(), []);
+  const catOptions = categories || [];
+  const motorOptions = motorTypes || [];
   const brands = useMemo(() => [...new Set(allFaults.map(f => f.brand))].sort(), [allFaults]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.brand.trim() || !form.model.trim() || !form.fault.trim()) return;
 
@@ -39,15 +39,19 @@ export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubm
       return;
     }
 
-    const pending = loadPending();
-    savePending([...pending, {
-      ...draft,
-      _pendingId: `p-${Date.now()}`,
-      _submittedBy: user?.username || 'Anonim',
-      _submittedAt: new Date().toLocaleDateString('tr-TR'),
-    }]);
-    setSubmitted(true);
-    if (onSubmit) onSubmit();
+    try {
+      const pending = await loadPending();
+      await savePending([...pending, {
+        ...draft,
+        _pendingId: `p-${Date.now()}`,
+        _submittedBy: user?.username || 'Anonim',
+        _submittedAt: new Date().toLocaleDateString('tr-TR'),
+      }]);
+      setSubmitted(true);
+      if (onSubmit) onSubmit();
+    } catch (err) {
+      console.error("Failed to save pending suggestion", err);
+    }
   };
 
   if (submitted) {

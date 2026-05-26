@@ -21,10 +21,10 @@ export default function AdminHub({
   open, tab, onTab, onClose,
   faults, models, onApproveFaults, onEditFault, onEditModel, onNewModel, onNotify,
 }) {
-  const [pending, setPending] = useState(() => loadPending());
-  const [forum, setForum] = useState(() => loadForum());
-  const [categories, setCategories] = useState(() => loadCategories());
-  const [motorTypes, setMotorTypes] = useState(() => loadMotorTypes());
+  const [pending, setPending] = useState([]);
+  const [forum, setForum] = useState({});
+  const [categories, setCategories] = useState([]);
+  const [motorTypes, setMotorTypes] = useState([]);
   const [newCat, setNewCat] = useState('');
   const [newMotor, setNewMotor] = useState('');
   const [editPost, setEditPost] = useState(null);
@@ -33,13 +33,31 @@ export default function AdminHub({
 
   useEffect(() => {
     if (!open) return;
-    setPending(loadPending());
-    setForum(loadForum());
+    async function loadData() {
+      try {
+        const [pendingData, forumData, categoriesData, motorTypesData] = await Promise.all([
+          loadPending(),
+          loadForum(),
+          loadCategories(),
+          loadMotorTypes()
+        ]);
+        setPending(pendingData);
+        setForum(forumData);
+        setCategories(categoriesData);
+        setMotorTypes(motorTypesData);
+      } catch (err) {
+        console.error("Failed to load admin hub data", err);
+      }
+    }
+    loadData();
   }, [open]);
 
   useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key === 'ka_pending_faults') setPending(loadPending());
+    const onStorage = async (e) => {
+      if (e.key === 'ka_pending_faults') {
+        const data = await loadPending();
+        setPending(data);
+      }
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);

@@ -23,12 +23,12 @@ function initForm(fault) {
   };
 }
 
-export default function FaultEditModal({ fault, allFaults, onSave, onClose }) {
+export default function FaultEditModal({ fault, allFaults, onSave, onClose, categories, motorTypes }) {
   const isPending = Boolean(fault?._pendingId);
   const [form, setForm] = useState(() => initForm(fault));
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
-  const catOptions = useMemo(() => loadCategories(), []);
-  const motorOptions = useMemo(() => loadMotorTypes(), []);
+  const catOptions = categories || [];
+  const motorOptions = motorTypes || [];
   const brands = useMemo(() => [...new Set(allFaults.map(f => f.brand))].sort(), [allFaults]);
 
   const costInvalid = Number(form.costMin) > 0 && Number(form.costMax) > 0 && Number(form.costMin) > Number(form.costMax);

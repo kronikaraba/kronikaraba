@@ -83,15 +83,15 @@ function typeConfig(type) {
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 
-export function getCommentCount(faultId) {
-  const stored = loadForum();
+export function getCommentCount(faultId, loadedForum) {
+  const stored = loadedForum || {};
   const posts = stored[faultId] || SEED[faultId] || [];
   return posts.length + posts.reduce((s, p) => s + (p.replies || []).length, 0);
 }
 
 // Bulk: load forum once, return a map of faultId → total comment count
-export function buildCommentCountMap(faultIds) {
-  const stored = loadForum();
+export function buildCommentCountMap(faultIds, loadedForum) {
+  const stored = loadedForum || {};
   const map = {};
   for (const id of faultIds) {
     const posts = stored[id] || SEED[id] || [];
@@ -273,15 +273,8 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
   // Admin yetkisi: hem live-edit modunda hem de user.isAdmin olan hesapta çalışır
   const adminMode = adminModeProp || user?.isAdmin === true;
 
-  const [forum, setForum] = useState(() => {
-    const stored = loadForum();
-    // Merge seed data (only if not already stored)
-    const merged = { ...stored };
-    if (SEED[faultId] && !stored[faultId]) {
-      merged[faultId] = SEED[faultId];
-    }
-    return merged;
-  });
+  const [forum, setForum] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const [open, setOpen] = useState(alwaysOpenProp || adminMode || false);
   const [newText, setNewText] = useState('');
@@ -291,18 +284,31 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
   const [activeTab, setActiveTab] = useState('all');
   const [editPost, setEditPost] = useState(null);   // { postId, replyId?, text, isReply }
 
-  const posts = forum[faultId] || [];
+  const posts = forum ? (forum[faultId] || []) : [];
 
   useEffect(() => {
-    saveForum(forum);
-  }, [forum]);
-
-  // Ensure seed is loaded for this fault
-  useEffect(() => {
-    if (SEED[faultId] && !(forum[faultId])) {
-      setForum(prev => ({ ...prev, [faultId]: SEED[faultId] }));
+    async function loadData() {
+      try {
+        const stored = await loadForum();
+        const merged = { ...stored };
+        if (SEED[faultId] && !stored[faultId]) {
+          merged[faultId] = SEED[faultId];
+        }
+        setForum(merged);
+      } catch (err) {
+        console.error("Failed to load forum comments", err);
+      } finally {
+        setLoading(false);
+      }
     }
+    loadData();
   }, [faultId]);
+
+  useEffect(() => {
+    if (forum !== null) {
+      saveForum(forum);
+    }
+  }, [forum]);
 
   const deletePost = (postId) => {
     if (!confirm('Bu konuyu silmek istiyor musunuz?')) return;

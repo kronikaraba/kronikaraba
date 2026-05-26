@@ -1,19 +1,40 @@
 import { faultData as defaultFaults } from './data.js';
 import { modelDetails as defaultModelDetails } from './modelData.js';
 
-export const FAULTS_KEY = 'ka_admin_faults';
-export const MODELS_KEY = 'ka_admin_models';
 export const ADMIN_KEY = 'ka_admin_session';
 export const ADMIN_PASS_KEY = 'ka_admin_password';
 export const ADMIN_USER_KEY = 'ka_admin_username';
-export const FORUM_KEY = 'ka_forum_v2';
-export const PENDING_KEY = 'ka_pending_faults';
-export const USERS_KEY = 'ka_users';
 
 const DEFAULT_PASS = 'admin123';
 const DEFAULT_USER = 'admin';
 
-// ── SHA-256 hash utility ──
+// ── API Helpers ──────────────────────────────────────────────────────────────
+const API_BASE = '/api/data';
+
+async function apiLoad(key) {
+  try {
+    const res = await fetch(`${API_BASE}?key=${key}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error(`apiLoad(${key}) failed:`, err);
+    return null;
+  }
+}
+
+async function apiSave(key, data) {
+  try {
+    await fetch(API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, data }),
+    });
+  } catch (err) {
+    console.error(`apiSave(${key}) failed:`, err);
+  }
+}
+
+// ── SHA-256 hash utility ─────────────────────────────────────────────────────
 async function hashPassword(password) {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
@@ -22,19 +43,9 @@ async function hashPassword(password) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Sync hash for initial seed (not secure, just to avoid plaintext)
-function hashPasswordSync(password) {
-  // Simple sync hash fallback: djb2 + base16 (for seed data only)
-  let hash = 5381;
-  for (let i = 0; i < password.length; i++) {
-    hash = ((hash << 5) + hash) + password.charCodeAt(i);
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return 'djb2_' + Math.abs(hash).toString(16);
-}
-
 export { hashPassword };
 
+// ── Admin Auth (stays in localStorage — per-browser session) ─────────────────
 export function isAdmin() {
   return localStorage.getItem(ADMIN_KEY) === 'true';
 }
@@ -46,21 +57,17 @@ export async function adminLogin(username, password) {
 
   if (username === user) {
     if (storedPass) {
-      // Hashed password stored
       if (inputHash === storedPass) {
         localStorage.setItem(ADMIN_KEY, 'true');
         return true;
       }
-      // Fallback: check if stored pass is still plaintext (migration)
       if (password === storedPass) {
         localStorage.setItem(ADMIN_PASS_KEY, inputHash);
         localStorage.setItem(ADMIN_KEY, 'true');
         return true;
       }
     } else {
-      // No custom pass set — check against default
       if (password === DEFAULT_PASS) {
-        // Auto-migrate: store hashed version
         localStorage.setItem(ADMIN_PASS_KEY, inputHash);
         localStorage.setItem(ADMIN_KEY, 'true');
         return true;
@@ -74,66 +81,56 @@ export function adminLogout() {
   localStorage.removeItem(ADMIN_KEY);
 }
 
-export function loadAdminFaults() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(FAULTS_KEY));
-    return stored || defaultFaults;
-  } catch {
-    return defaultFaults;
-  }
+// ── Centralized Data (API-backed) ────────────────────────────────────────────
+
+// Faults
+export async function loadAdminFaults() {
+  const data = await apiLoad('faults');
+  return data || defaultFaults;
 }
 
-export function loadAdminModels() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(MODELS_KEY));
-    return stored || defaultModelDetails;
-  } catch {
-    return defaultModelDetails;
-  }
+export async function saveAdminFaults(data) {
+  return apiSave('faults', data);
 }
 
-export function saveAdminFaults(data) {
-  localStorage.setItem(FAULTS_KEY, JSON.stringify(data));
+// Models
+export async function loadAdminModels() {
+  const data = await apiLoad('models');
+  return data || defaultModelDetails;
 }
 
-export function saveAdminModels(data) {
-  localStorage.setItem(MODELS_KEY, JSON.stringify(data));
+export async function saveAdminModels(data) {
+  return apiSave('models', data);
 }
 
-export function loadForum() {
-  try {
-    return JSON.parse(localStorage.getItem(FORUM_KEY)) || {};
-  } catch {
-    return {};
-  }
+// Forum
+export async function loadForum() {
+  const data = await apiLoad('forum');
+  return data || {};
 }
 
-export function saveForum(data) {
-  localStorage.setItem(FORUM_KEY, JSON.stringify(data));
+export async function saveForum(data) {
+  return apiSave('forum', data);
 }
 
-export function loadPending() {
-  try {
-    return JSON.parse(localStorage.getItem(PENDING_KEY)) || [];
-  } catch {
-    return [];
-  }
+// Pending
+export async function loadPending() {
+  const data = await apiLoad('pending');
+  return data || [];
 }
 
-export function savePending(data) {
-  localStorage.setItem(PENDING_KEY, JSON.stringify(data));
+export async function savePending(data) {
+  return apiSave('pending', data);
 }
 
-export function loadUsers() {
-  try {
-    return JSON.parse(localStorage.getItem(USERS_KEY)) || [];
-  } catch {
-    return [];
-  }
+// Users
+export async function loadUsers() {
+  const data = await apiLoad('users');
+  return data || [];
 }
 
-export function saveUsers(data) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(data));
+export async function saveUsers(data) {
+  return apiSave('users', data);
 }
 
 export function getAdminUsername() {
