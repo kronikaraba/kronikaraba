@@ -578,6 +578,20 @@ function Toast({ message, onDone }) {
   );
 }
 
+const safeGetHistoryState = () => {
+  try {
+    if (typeof window !== 'undefined' && window.history && window.history.state) {
+      const s = window.history.state;
+      if (s && typeof s === 'object') {
+        return s;
+      }
+    }
+  } catch (e) {
+    console.error("Error reading history state:", e);
+  }
+  return null;
+};
+
 // ── App ───────────────────────────────────────────────────────────────────────
 function AppContent() {
   const {
@@ -611,7 +625,7 @@ function AppContent() {
         setForum(loadedForum);
 
         // Restore selected fault if a selectedFaultId is in the history state
-        const stateId = window.history.state?.selectedFaultId;
+        const stateId = safeGetHistoryState()?.selectedFaultId;
         if (stateId) {
           const found = loadedData.find(f => String(f.id) === String(stateId));
           if (found) {
@@ -626,9 +640,12 @@ function AppContent() {
     }
     initAll();
   }, []);
-  const [search, setSearch] = useState(() => window.history.state?.search || '');
+
+  const historyState = safeGetHistoryState();
+
+  const [search, setSearch] = useState(() => historyState?.search || '');
   const [sort, setSort] = useState('reports-desc');
-  const [filters, setFilters] = useState(() => window.history.state?.filters || {
+  const [filters, setFilters] = useState(() => historyState?.filters || {
     brand: '', model: '', yearMin: '', yearMax: '', motorType: '',
     kmMin: '', category: '', costMin: '', costMax: '', risk: '', minReports: ''
   });
@@ -638,11 +655,11 @@ function AppContent() {
   const [authModal, setAuthModal] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(() => window.history.state?.selectedModel || null);
+  const [selectedModel, setSelectedModel] = useState(() => historyState?.selectedModel || null);
   const [selectedFault, setSelectedFault] = useState(null);
-  const [activeView, setActiveView] = useState(() => window.history.state?.activeView || 'home');
+  const [activeView, setActiveView] = useState(() => historyState?.activeView || 'home');
   const [editModel, setEditModel] = useState(null);
-  const [forceExplorer, setForceExplorer] = useState(() => window.history.state?.forceExplorer || false);
+  const [forceExplorer, setForceExplorer] = useState(() => historyState?.forceExplorer || false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(20);
   const PAGE_SIZE = 20;
@@ -708,44 +725,54 @@ function AppContent() {
 
   // Replace initial history entry so back from first page works
   useEffect(() => {
-    if (!window.history.state) {
-      window.history.replaceState(buildNavState(), '');
+    try {
+      if (typeof window !== 'undefined' && window.history && !window.history.state) {
+        window.history.replaceState(buildNavState(), '');
+      }
+    } catch (e) {
+      console.error("Error setting initial replaceState:", e);
     }
   }, [buildNavState]); // only on mount if state is empty
 
   // Listen for browser back/forward
   useEffect(() => {
     const handlePopState = (e) => {
-      const s = e.state;
-      if (!s) {
-        // No state = initial page, go to landing
+      try {
+        const s = e.state;
+        if (!s || typeof s !== 'object') {
+          // No state = initial page, go to landing
+          skipPushRef.current = true;
+          setActiveView('home');
+          setSelectedModel(null);
+          setSelectedFault(null);
+          setForceExplorer(false);
+          setSearch('');
+          setFilters({ brand: '', model: '', yearMin: '', yearMax: '', motorType: '', kmMin: '', category: '', costMin: '', costMax: '', risk: '', minReports: '' });
+          skipPushRef.current = false;
+          return;
+        }
         skipPushRef.current = true;
-        setActiveView('home');
-        setSelectedModel(null);
-        setSelectedFault(null);
-        setForceExplorer(false);
-        setSearch('');
-        setFilters({ brand: '', model: '', yearMin: '', yearMax: '', motorType: '', kmMin: '', category: '', costMin: '', costMax: '', risk: '', minReports: '' });
+        setActiveView(s.activeView || 'home');
+        setSelectedModel(s.selectedModel || null);
+        // Restore selectedFault from ID
+        if (s.selectedFaultId) {
+          setSelectedFault(prev => {
+            // Try to find fault from current data
+            const found = data.find(f => String(f.id) === String(s.selectedFaultId));
+            return found || prev;
+          });
+        } else {
+          setSelectedFault(null);
+        }
+        setForceExplorer(s.forceExplorer || false);
+        setSearch(s.search || '');
+        if (s.filters && typeof s.filters === 'object') {
+          setFilters(s.filters);
+        }
         skipPushRef.current = false;
-        return;
+      } catch (err) {
+        console.error("Error in popstate handler:", err);
       }
-      skipPushRef.current = true;
-      setActiveView(s.activeView || 'home');
-      setSelectedModel(s.selectedModel || null);
-      // Restore selectedFault from ID
-      if (s.selectedFaultId) {
-        setSelectedFault(prev => {
-          // Try to find fault from current data
-          const found = data.find(f => String(f.id) === String(s.selectedFaultId));
-          return found || prev;
-        });
-      } else {
-        setSelectedFault(null);
-      }
-      setForceExplorer(s.forceExplorer || false);
-      setSearch(s.search || '');
-      if (s.filters) setFilters(s.filters);
-      skipPushRef.current = false;
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
