@@ -609,6 +609,15 @@ function AppContent() {
         setCategories(loadedCats);
         setMotorTypes(loadedMotors);
         setForum(loadedForum);
+
+        // Restore selected fault if a selectedFaultId is in the history state
+        const stateId = window.history.state?.selectedFaultId;
+        if (stateId) {
+          const found = loadedData.find(f => String(f.id) === String(stateId));
+          if (found) {
+            setSelectedFault(found);
+          }
+        }
       } catch (err) {
         console.error("Failed to load initial data", err);
       } finally {
@@ -617,9 +626,9 @@ function AppContent() {
     }
     initAll();
   }, []);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => window.history.state?.search || '');
   const [sort, setSort] = useState('reports-desc');
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState(() => window.history.state?.filters || {
     brand: '', model: '', yearMin: '', yearMax: '', motorType: '',
     kmMin: '', category: '', costMin: '', costMax: '', risk: '', minReports: ''
   });
@@ -629,11 +638,11 @@ function AppContent() {
   const [authModal, setAuthModal] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(null);
+  const [selectedModel, setSelectedModel] = useState(() => window.history.state?.selectedModel || null);
   const [selectedFault, setSelectedFault] = useState(null);
-  const [activeView, setActiveView] = useState('home');
+  const [activeView, setActiveView] = useState(() => window.history.state?.activeView || 'home');
   const [editModel, setEditModel] = useState(null);
-  const [forceExplorer, setForceExplorer] = useState(false);
+  const [forceExplorer, setForceExplorer] = useState(() => window.history.state?.forceExplorer || false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(20);
   const PAGE_SIZE = 20;
@@ -699,8 +708,10 @@ function AppContent() {
 
   // Replace initial history entry so back from first page works
   useEffect(() => {
-    window.history.replaceState(buildNavState(), '');
-  }, []); // only on mount
+    if (!window.history.state) {
+      window.history.replaceState(buildNavState(), '');
+    }
+  }, [buildNavState]); // only on mount if state is empty
 
   // Listen for browser back/forward
   useEffect(() => {
@@ -725,7 +736,7 @@ function AppContent() {
       if (s.selectedFaultId) {
         setSelectedFault(prev => {
           // Try to find fault from current data
-          const found = data.find(f => f.id === s.selectedFaultId);
+          const found = data.find(f => String(f.id) === String(s.selectedFaultId));
           return found || prev;
         });
       } else {
@@ -809,9 +820,9 @@ function AppContent() {
     handleNavAction('reset');
   };
 
-  const persistFaults = useCallback((next) => {
-    saveAdminFaults(next);
+  const persistFaults = useCallback(async (next) => {
     setData(next);
+    await saveAdminFaults(next);
   }, []);
 
   const handleLogin = (u) => { setUser(u); setToast(`Hoş geldiniz, ${u.username}!`); };
@@ -862,11 +873,11 @@ function AppContent() {
   const handleSaveFault = async (fault) => {
     const pendingId = fault._pendingId;
     const normalized = normalizeFault(fault);
-    const idx = data.findIndex(f => f.id === normalized.id);
+    const idx = data.findIndex(f => String(f.id) === String(normalized.id));
     const next = idx >= 0
-      ? data.map((f, i) => (i === idx ? normalized : f))
+      ? data.map((f, i) => (String(f.id) === String(normalized.id) ? normalized : f))
       : [normalized, ...data];
-    persistFaults(next);
+    await persistFaults(next);
     if (pendingId) {
       try {
         const pendingList = await loadPending();
@@ -877,25 +888,25 @@ function AppContent() {
       }
     }
     setEditFault(null);
-    if (selectedFault && selectedFault.id === normalized.id) {
+    if (selectedFault && String(selectedFault.id) === String(normalized.id)) {
       setSelectedFault(normalized);
     }
     setToast(pendingId ? 'Öneri yayınlandı!' : 'Arıza kaydedildi!');
   };
 
-  const handleDeleteFault = (id) => {
+  const handleDeleteFault = async (id) => {
     if (!confirm('Bu arızayı silmek istediğinize emin misiniz?')) return;
-    persistFaults(data.filter(f => f.id !== id));
-    if (selectedFault && selectedFault.id === id) {
+    await persistFaults(data.filter(f => String(f.id) !== String(id)));
+    if (selectedFault && String(selectedFault.id) === String(id)) {
       setSelectedFault(null);
     }
     setToast('Arıza silindi.');
   };
 
-  const handleApprovePending = (fault) => {
+  const handleApprovePending = async (fault) => {
     const normalized = normalizeFault(fault);
-    const exists = data.some(f => f.id === normalized.id);
-    persistFaults(exists ? data.map(f => (f.id === normalized.id ? normalized : f)) : [normalized, ...data]);
+    const exists = data.some(f => String(f.id) === String(normalized.id));
+    await persistFaults(exists ? data.map(f => (String(f.id) === String(normalized.id) ? normalized : f)) : [normalized, ...data]);
     refreshPending();
   };
 
@@ -960,10 +971,10 @@ function AppContent() {
               adminMode={adminMode}
               onEdit={setEditFault}
               onDelete={handleDeleteFault}
-              onVerify={(f) => {
+              onVerify={async (f) => {
                 const updated = { ...f, reportCount: f.reportCount + 1 };
-                const next = data.map(d => d.id === f.id ? updated : d);
-                persistFaults(next);
+                const next = data.map(d => String(d.id) === String(f.id) ? updated : d);
+                await persistFaults(next);
                 setSelectedFault(updated);
               }}
               onSuggestFault={openSuggest}

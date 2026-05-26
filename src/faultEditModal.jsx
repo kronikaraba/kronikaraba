@@ -38,13 +38,13 @@ export default function FaultEditModal({ fault, allFaults, onSave, onClose, cate
     if (!form.brand?.trim() || !form.model?.trim() || !form.fault?.trim()) return;
     if (costInvalid) return;
     const { yearMin, yearMax, year } = parseYearRange(form.year);
-    onSave(normalizeFault({
+    onSave({
       ...form,
       year,
       yearMin,
       yearMax,
       _pendingId: form._pendingId,
-    }));
+    });
   };
 
   return (
