@@ -26,25 +26,58 @@ function initForm(fault) {
 export default function FaultEditModal({ fault, allFaults, onSave, onClose, categories, motorTypes }) {
   const isPending = Boolean(fault?._pendingId);
   const [form, setForm] = useState(() => initForm(fault));
+  const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
   const catOptions = categories || [];
   const motorOptions = motorTypes || [];
-  const brands = useMemo(() => [...new Set(allFaults.map(f => f.brand))].sort(), [allFaults]);
+  const brandOptions = useMemo(() => {
+    return [...new Set([...allFaults.map(f => f.brand), form.brand].filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'tr'));
+  }, [allFaults, form.brand]);
+  const modelOptions = useMemo(() => {
+    const models = allFaults.filter(f => f.brand === form.brand).map(f => f.model);
+    if (form.model && !models.includes(form.model)) models.push(form.model);
+    return [...new Set(models)].sort((a, b) => a.localeCompare(b, 'tr'));
+  }, [allFaults, form.brand, form.model]);
+
+  const setBrand = (brand) => {
+    setForm(prev => ({
+      ...prev,
+      brand,
+      model: allFaults.some(f => f.brand === brand && f.model === prev.model) ? prev.model : '',
+    }));
+  };
 
   const costInvalid = Number(form.costMin) > 0 && Number(form.costMax) > 0 && Number(form.costMin) > Number(form.costMax);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    if (!form.brand?.trim() || !form.model?.trim() || !form.fault?.trim()) return;
-    if (costInvalid) return;
+    setSubmitError('');
+    if (!form.brand?.trim() || !form.model?.trim() || !form.fault?.trim()) {
+      setSubmitError('Marka, model ve ariza basligi zorunludur.');
+      return;
+    }
+    if (costInvalid) {
+      setSubmitError('Maksimum masraf, minimumdan kucuk olamaz.');
+      return;
+    }
     const { yearMin, yearMax, year } = parseYearRange(form.year);
-    onSave({
-      ...form,
-      year,
-      yearMin,
-      yearMax,
-      _pendingId: form._pendingId,
-    });
+    setSaving(true);
+    try {
+      await onSave({
+        ...form,
+        year,
+        yearMin,
+        yearMax,
+        _pendingId: form._pendingId,
+      });
+    } catch (err) {
+      console.error('Failed to save fault', err);
+      setSubmitError('Ariza kaydedilemedi. Lutfen tekrar deneyin.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -64,12 +97,17 @@ export default function FaultEditModal({ fault, allFaults, onSave, onClose, cate
             <div className="form-row">
               <div className="form-group">
                 <label>Marka *</label>
-                <input list="fault-brands" value={form.brand} onChange={e => set('brand', e.target.value)} placeholder="örn. Volkswagen" required />
-                <datalist id="fault-brands">{brands.map(b => <option key={b} value={b} />)}</datalist>
+                <select value={form.brand} onChange={e => setBrand(e.target.value)} required>
+                  <option value="" disabled>Marka seçin</option>
+                  {brandOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
               </div>
               <div className="form-group">
                 <label>Model *</label>
-                <input value={form.model} onChange={e => set('model', e.target.value)} placeholder="örn. Golf 1.4 TSI" required />
+                <select value={form.model} onChange={e => set('model', e.target.value)} required disabled={!form.brand}>
+                  <option value="" disabled>Model seçin</option>
+                  {modelOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
               </div>
             </div>
             <div className="form-row">
@@ -113,6 +151,7 @@ export default function FaultEditModal({ fault, allFaults, onSave, onClose, cate
               </div>
             </div>
             {costInvalid && <p className="form-error">Maksimum masraf, minimumdan küçük olamaz.</p>}
+            {submitError && <p className="form-error">{submitError}</p>}
             <div className="form-row">
               <div className="form-group">
                 <label>Görüldüğü KM (metin)</label>
@@ -143,9 +182,9 @@ export default function FaultEditModal({ fault, allFaults, onSave, onClose, cate
             </div>
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn-cancel" onClick={onClose}>İptal</button>
-            <button type="submit" className="btn-submit" disabled={costInvalid}>
-              {isPending ? 'Yayınla' : 'Kaydet'}
+            <button type="button" className="btn-cancel" onClick={onClose} disabled={saving}>İptal</button>
+            <button type="submit" className="btn-submit" disabled={costInvalid || saving}>
+              {saving ? 'Kaydediliyor...' : (isPending ? 'Yayınla' : 'Kaydet')}
             </button>
           </div>
         </form>

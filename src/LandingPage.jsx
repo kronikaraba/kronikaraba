@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Editable } from './liveEdit.jsx';
+import { getFaultDateLabel } from './dateUtils.js';
+import { popularModelTags } from './popularModels.js';
 
 export default function LandingPage({
   data,
@@ -11,6 +13,7 @@ export default function LandingPage({
   onExploreAll,
   onSuggestFault,
   content,
+  activityMap = {},
 }) {
   const [searchVal, setSearchVal] = useState('');
   const lp = content?.landing || {};
@@ -41,10 +44,26 @@ export default function LandingPage({
   [data]);
 
   const recentFaults = useMemo(() =>
-    [...data].slice(0, 8),
-  [data]);
+    [...data]
+      .sort((a, b) => {
+        const aTime = activityMap[a.id]?.timestamp || 0;
+        const bTime = activityMap[b.id]?.timestamp || 0;
+        return bTime - aTime || b.reportCount - a.reportCount;
+      })
+      .slice(0, 8),
+  [data, activityMap]);
 
   const fmt = (n) => Number(n).toLocaleString('tr-TR');
+
+  const submitSearch = (e) => {
+    e?.preventDefault();
+    const q = searchVal.trim();
+    if (q) {
+      onSearch(q);
+    } else {
+      onExploreAll();
+    }
+  };
 
   const RISK_COLOR = {
     'YÜKSEK': { bg: 'var(--red-bg)', text: 'var(--red-text)', dot: 'var(--red)' },
@@ -93,7 +112,7 @@ export default function LandingPage({
 
         {/* Search bar inside banner */}
         <div className="lp-banner-search-wrap">
-          <div className="lp-banner-search">
+          <form className="lp-banner-search" onSubmit={submitSearch}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
@@ -101,13 +120,13 @@ export default function LandingPage({
               type="text"
               placeholder="Marka, model veya arıza arayın… (ör: TSI zincir, DSG sarsıntı)"
               value={searchVal}
-              onChange={(e) => { setSearchVal(e.target.value); onSearch(e.target.value); }}
+              onChange={(e) => setSearchVal(e.target.value)}
             />
-            <button type="button" onClick={() => onExploreAll()} className="lp-search-btn">Ara</button>
-          </div>
+            <button type="submit" className="lp-search-btn">Ara</button>
+          </form>
           <div className="lp-quick-tags">
             <span className="lp-qt-label">Popüler:</span>
-            {['TSI','DSG','BMW Zincir','Mecatronik','Direksiyon'].map(q => (
+            {popularModelTags.map(q => (
               <button key={q} type="button" className="lp-qt-tag" onClick={() => { setSearchVal(q); onSearch(q); }}>{q}</button>
             ))}
           </div>
@@ -156,6 +175,7 @@ export default function LandingPage({
               {recentFaults.map((f, i) => {
                 const rc = RISK_COLOR[f.risk] || RISK_COLOR['ORTA'];
                 const icon = CAT_ICON[f.category] || '🔧';
+                const activity = activityMap[f.id];
                 return (
                   <div
                     key={f.id}
@@ -175,6 +195,10 @@ export default function LandingPage({
                         >{f.brand} {f.model}</span>
                         <span className="lp-tr-dot">·</span>
                         <span className="lp-tr-title">{f.description || f.fault}</span>
+                        <span className="lp-tr-dot">·</span>
+                        <span className="lp-tr-activity" title={`Son hareket: ${activity?.exact || getFaultDateLabel(f)}`}>
+                          {activity?.fullLabel || `Kayıt: ${getFaultDateLabel(f)}`}
+                        </span>
                       </div>
                       <div className="lp-tr-meta">
                         <span className="lp-tr-cat-tag">{f.category}</span>

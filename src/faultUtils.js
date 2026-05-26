@@ -38,6 +38,8 @@ export function normalizeFault(f) {
   const costMax = Number(f.costMax) || 0;
 
   const cleaned = { ...f };
+  const now = new Date().toISOString();
+  const createdAt = f.createdAt || f.suggestedAt || f._submittedAt || now;
   delete cleaned._pendingId;
   delete cleaned._submittedBy;
   delete cleaned._submittedAt;
@@ -49,6 +51,8 @@ export function normalizeFault(f) {
   return {
     ...cleaned,
     id: cleaned.id || Date.now(),
+    createdAt,
+    updatedAt: f.updatedAt || now,
     brand: String(f.brand || '').trim(),
     model: String(f.model || '').trim(),
     fault: faultText,

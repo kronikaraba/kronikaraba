@@ -15,7 +15,22 @@ export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubm
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
   const catOptions = categories || [];
   const motorOptions = motorTypes || [];
-  const brands = useMemo(() => [...new Set(allFaults.map(f => f.brand))].sort(), [allFaults]);
+  const brandOptions = useMemo(() => {
+    return [...new Set(allFaults.map(f => f.brand).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'tr'));
+  }, [allFaults]);
+  const modelOptions = useMemo(() => {
+    return [...new Set(allFaults.filter(f => f.brand === form.brand).map(f => f.model).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'tr'));
+  }, [allFaults, form.brand]);
+
+  const setBrand = (brand) => {
+    setForm(prev => ({
+      ...prev,
+      brand,
+      model: allFaults.some(f => f.brand === brand && f.model === prev.model) ? prev.model : '',
+    }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,11 +56,12 @@ export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubm
 
     try {
       const pending = await loadPending();
+      const now = new Date().toISOString();
       await savePending([...pending, {
         ...draft,
         _pendingId: `p-${Date.now()}`,
         _submittedBy: user?.username || 'Anonim',
-        _submittedAt: new Date().toLocaleDateString('tr-TR'),
+        _submittedAt: now,
       }]);
       setSubmitted(true);
       if (onSubmit) onSubmit();
@@ -97,12 +113,17 @@ export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubm
             <div className="form-row">
               <div className="form-group">
                 <label>Marka *</label>
-                <input list="suggest-brands" value={form.brand} onChange={e => set('brand', e.target.value)} placeholder="örn. Volkswagen" required />
-                <datalist id="suggest-brands">{brands.map(b => <option key={b} value={b} />)}</datalist>
+                <select value={form.brand} onChange={e => setBrand(e.target.value)} required>
+                  <option value="" disabled>Marka seçin</option>
+                  {brandOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
               </div>
               <div className="form-group">
                 <label>Model *</label>
-                <input value={form.model} onChange={e => set('model', e.target.value)} placeholder="örn. Golf" required />
+                <select value={form.model} onChange={e => set('model', e.target.value)} required disabled={!form.brand}>
+                  <option value="" disabled>Model seçin</option>
+                  {modelOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
               </div>
             </div>
             <div className="form-group">

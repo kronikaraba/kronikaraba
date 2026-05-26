@@ -17,6 +17,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const token = process.env.BLOB_READ_WRITE_TOKEN;
@@ -40,8 +41,11 @@ export default async function handler(req, res) {
         return res.status(200).json(null);
       }
 
+      const blob = blobs.find(b => b.pathname === pathname)
+        || blobs.sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0))[0];
+
       // Fetch the blob content
-      const response = await fetch(blobs[0].url);
+      const response = await fetch(blob.url, { cache: 'no-store' });
       if (!response.ok) {
         return res.status(200).json(null);
       }

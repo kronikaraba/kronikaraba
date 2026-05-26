@@ -1,0 +1,17 @@
+export const popularModelTags = [
+  'Fiat Egea',
+  'Renault Clio',
+  'Renault Megane Sedan',
+  'Toyota Corolla',
+  'Honda Civic',
+  'Volkswagen Passat',
+  'Dacia Duster',
+  'Hyundai i20',
+  'Ford Focus',
+  'Volkswagen Golf',
+  'Toyota C-HR',
+  'Peugeot 3008',
+  'Nissan Qashqai',
+  'Togg T10X',
+  'Volkswagen Polo',
+];

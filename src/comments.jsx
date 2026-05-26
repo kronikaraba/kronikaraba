@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { loadForum, saveForum, getAdminUsername } from './adminStorage.js';
 import { ForumPostImages, ForumImageAttach } from './ForumImages.jsx';
+import { formatDateTimeMinute, getCommentDateDisplay, getCommentDateLabel, getFaultActivityInfo } from './dateUtils.js';
 
 // ── Seed data — pre-filled forum posts per fault id ──────────────────────────
 const SEED = {
@@ -83,19 +84,30 @@ function typeConfig(type) {
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 
-export function getCommentCount(faultId, loadedForum) {
+export function getForumPostsForFault(faultId, loadedForum) {
   const stored = loadedForum || {};
-  const posts = stored[faultId] || SEED[faultId] || [];
+  return stored[faultId] || SEED[faultId] || [];
+}
+
+export function getCommentCount(faultId, loadedForum) {
+  const posts = getForumPostsForFault(faultId, loadedForum);
   return posts.length + posts.reduce((s, p) => s + (p.replies || []).length, 0);
 }
 
 // Bulk: load forum once, return a map of faultId → total comment count
 export function buildCommentCountMap(faultIds, loadedForum) {
-  const stored = loadedForum || {};
   const map = {};
   for (const id of faultIds) {
-    const posts = stored[id] || SEED[id] || [];
+    const posts = getForumPostsForFault(id, loadedForum);
     map[id] = posts.length + posts.reduce((s, p) => s + (p.replies || []).length, 0);
+  }
+  return map;
+}
+
+export function buildFaultActivityMap(faults, loadedForum) {
+  const map = {};
+  for (const fault of faults || []) {
+    map[fault.id] = getFaultActivityInfo(fault, getForumPostsForFault(fault.id, loadedForum));
   }
   return map;
 }
@@ -103,6 +115,7 @@ export function buildCommentCountMap(faultIds, loadedForum) {
 // ── Reply item ────────────────────────────────────────────────────────────────
 function ReplyItem({ reply, user, onVote, adminMode, onAdminDeleteReply, onAdminEditReply }) {
   const voted = user && (reply.voters || []).includes(user.id);
+  const exactDate = getCommentDateLabel(reply);
   return (
     <div className="forum-reply">
       <div className="forum-avatar sm">{(reply.username || '?')[0].toUpperCase()}</div>
@@ -110,7 +123,7 @@ function ReplyItem({ reply, user, onVote, adminMode, onAdminDeleteReply, onAdmin
         <div className="forum-meta">
           <span className="forum-author">{reply.username}</span>
           {reply.isUsta && <span className="usta-tag">Usta</span>}
-          <span className="forum-date">{reply.date}</span>
+          <span className="forum-date" title={`Yorum tarihi: ${exactDate}`}>{getCommentDateDisplay(reply)}</span>
           {adminMode && (
             <span className="forum-reply-admin-actions">
               <button type="button" className="forum-reply-btn forum-admin-btn" onClick={() => onAdminEditReply(reply)} title="Yanıtı Düzenle">
@@ -150,6 +163,7 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
   const [showReplies, setShowReplies] = useState(true);
   const cfg = typeConfig(post.type);
   const voted = user && (post.voters || []).includes(user.id);
+  const exactDate = getCommentDateLabel(post);
 
   const submitReply = (e) => {
     e.preventDefault();
@@ -181,7 +195,7 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
           <div className="forum-meta">
             <span className="forum-author">{post.username}</span>
             {post.isUsta && <span className="usta-tag">Usta</span>}
-            <span className="forum-date">{post.date}</span>
+            <span className="forum-date" title={`Yorum tarihi: ${exactDate}`}>{getCommentDateDisplay(post)}</span>
           </div>
           {post.text ? <p className="forum-text">{post.text}</p> : null}
           <ForumPostImages images={post.images} />
@@ -269,7 +283,7 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
 }
 
 // ── Main CommentSection ───────────────────────────────────────────────────────
-export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminModeProp, alwaysOpen: alwaysOpenProp }) {
+export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminModeProp, alwaysOpen: alwaysOpenProp, onForumChange }) {
   // Admin yetkisi: hem live-edit modunda hem de user.isAdmin olan hesapta çalışır
   const adminMode = adminModeProp || user?.isAdmin === true;
 
@@ -307,8 +321,9 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
   useEffect(() => {
     if (forum !== null) {
       saveForum(forum);
+      onForumChange && onForumChange(forum);
     }
-  }, [forum]);
+  }, [forum, onForumChange]);
 
   const deletePost = (postId) => {
     if (!confirm('Bu konuyu silmek istiyor musunuz?')) return;
@@ -338,6 +353,7 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
 
   const savePostEdit = () => {
     if (!editPost?.text?.trim()) return;
+    const now = new Date().toISOString();
     if (editPost.isReply) {
       // Yanıt düzenleme
       setForum(prev => ({
@@ -345,7 +361,7 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
         [faultId]: (prev[faultId] || []).map(p =>
           p.id === editPost.postId
             ? { ...p, replies: (p.replies || []).map(r =>
-                r.id === editPost.replyId ? { ...r, text: editPost.text.trim() } : r
+                r.id === editPost.replyId ? { ...r, text: editPost.text.trim(), updatedAt: now, date: formatDateTimeMinute(now) } : r
               )}
             : p
         ),
@@ -355,7 +371,7 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
       setForum(prev => ({
         ...prev,
         [faultId]: (prev[faultId] || []).map(p =>
-          p.id === editPost.id ? { ...p, text: editPost.text.trim() } : p
+          p.id === editPost.id ? { ...p, text: editPost.text.trim(), updatedAt: now, date: formatDateTimeMinute(now) } : p
         ),
       }));
     }
@@ -372,6 +388,7 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
     if (!newText.trim() && newImages.length === 0) return;
     const author = adminMode ? getAdminUsername() : user?.username;
     if (!author) { onAuthRequest(); return; }
+    const now = new Date().toISOString();
     const post = {
       id: `u-${Date.now()}`,
       type: newType,
@@ -379,7 +396,9 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
       isUsta: adminMode ? (newType === 'usta') : (newType === 'usta' ? true : isUsta),
       text: newText.trim(),
       images: newImages.length ? newImages : undefined,
-      date: new Date().toLocaleDateString('tr-TR'),
+      date: formatDateTimeMinute(now),
+      createdAt: now,
+      updatedAt: now,
       helpful: 0,
       voters: [],
       replies: [],
@@ -426,13 +445,16 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
     if (!author) return;
     const text = typeof payload === 'string' ? payload : (payload.text || '');
     const images = typeof payload === 'string' ? undefined : (payload.images?.length ? payload.images : undefined);
+    const now = new Date().toISOString();
     const reply = {
       id: `r-${Date.now()}`,
       username: author,
       isUsta: false,
       text,
       images,
-      date: new Date().toLocaleDateString('tr-TR'),
+      date: formatDateTimeMinute(now),
+      createdAt: now,
+      updatedAt: now,
       helpful: 0,
       voters: [],
     };

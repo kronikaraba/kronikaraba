@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CommentSection } from './comments.jsx';
 import { useLiveEdit } from './liveEdit.jsx';
+import { getFaultDateLabel } from './dateUtils.js';
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 const fmtCost = (min, max) => `₺${fmt(min)} – ₺${fmt(max)}`;
@@ -15,13 +16,16 @@ const CAT_ICONS = {
   Fren: '🛑',
 };
 
-export default function FaultDetailPage({ fault, user, onAuthRequest, onBack, onModelClick, adminMode, onEdit, onDelete, onVerify, onSuggestFault }) {
+export default function FaultDetailPage({ fault, activity, user, onAuthRequest, onBack, onModelClick, adminMode, onEdit, onDelete, onVerify, onSuggestFault, onForumChange }) {
   const { editMode, authed } = useLiveEdit();
   // Arıza düzenleme/silme: editMode de açık olmalı
   const showAdmin = adminMode && editMode;
   // Yorum yönetimi: admin girişi yeterli, editMode şartsız
   const commentAdminMode = authed || (adminMode && editMode);
   const catIcon = CAT_ICONS[fault.category] || '🔧';
+  const faultDate = getFaultDateLabel(fault);
+  const activityLabel = activity?.fullLabel || `Kayıt: ${faultDate}`;
+  const activityExact = activity?.exact || faultDate;
 
   // Verify state — check localStorage for per-user per-fault tracking
   const verifyKey = `ka_verified_${fault.id}`;
@@ -91,7 +95,9 @@ export default function FaultDetailPage({ fault, user, onAuthRequest, onBack, on
               <span className="fd-brand-link" onClick={() => onModelClick(fault.model)}>{fault.brand} {fault.model}</span>
             </div>
             <h1 className="fd-title">{fault.description}</h1>
-            <p className="fd-subtitle">{fault.year} · {fault.motorType}</p>
+            <p className="fd-subtitle">
+              {fault.year} · {fault.motorType} · Kayıt: {faultDate} · <span title={`Son hareket: ${activityExact}`}>Son hareket: {activityLabel}</span>
+            </p>
           </div>
           <div className="fd-hero-right">
             <span className={`risk-badge ${fault.risk}`}>{fault.risk} Risk</span>
@@ -180,6 +186,7 @@ export default function FaultDetailPage({ fault, user, onAuthRequest, onBack, on
           onAuthRequest={onAuthRequest}
           adminMode={commentAdminMode}
           alwaysOpen={true}
+          onForumChange={onForumChange}
         />
       </div>
     </div>

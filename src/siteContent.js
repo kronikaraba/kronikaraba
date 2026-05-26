@@ -57,7 +57,7 @@ export const defaultSiteContent = {
   },
 };
 
-export const defaultCategories = ['Motor', 'Şanzıman', 'Egzoz', 'Soğutma', 'Elektronik', 'Süspansiyon', 'Diğer'];
+export const defaultCategories = ['Motor', 'Şanzıman', 'Egzoz', 'Soğutma', 'Elektronik', 'Süspansiyon', 'Fren', 'Diğer'];
 export const defaultMotorTypes = ['Benzin', 'Dizel', 'Hibrit', 'Elektrik', 'LPG'];
 
 // ── Deep Merge ────────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { riskLevels } from './data.js';
 import { loadCategories, loadMotorTypes } from './siteContent.js';
 import { AuthModal, loadUser, logout } from './auth.jsx';
-import { CommentSection, getCommentCount, buildCommentCountMap } from './comments.jsx';
+import { CommentSection, getCommentCount, buildCommentCountMap, buildFaultActivityMap } from './comments.jsx';
 import ModelDetailPage from './ModelDetailPage.jsx';
 import FaultDetailPage from './FaultDetailPage.jsx';
 import { loadAdminFaults, saveAdminFaults, loadAdminModels, saveAdminModels, loadPending, savePending, loadForum } from './adminStorage.js';
@@ -14,10 +14,19 @@ import AdminHub from './adminHub.jsx';
 import { MarkalarlPage, UzmanPage, MasrafPage } from './Pages.jsx';
 import LandingPage from './LandingPage.jsx';
 import UserFaultSuggestModal from './UserFaultSuggestModal.jsx';
+import { getFaultActivityInfo } from './dateUtils.js';
+import { popularModelTags } from './popularModels.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 const fmtCost = (min, max) => `₺${fmt(min)} – ₺${fmt(max)}`;
+const matchesModelQuery = (fault, query) => {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return true;
+  const brand = String(fault.brand || '').toLowerCase();
+  const model = String(fault.model || '').toLowerCase();
+  return model.includes(q) || `${brand} ${model}`.includes(q);
+};
 
 // ── Navbar ────────────────────────────────────────────────────────────────────
 function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, onLogout, onMenuToggle, onLogoClick, onNavAction, activeView, onSuggest }) {
@@ -46,13 +55,13 @@ function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, o
         <a href="/" className={`nav-link${activeView === 'home' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('reset'); }}>
           <Editable value={nb.navLinks.home} path={['navbar', 'navLinks', 'home']} />
         </a>
-        <a href="/" className={`nav-link${activeView === 'markalar' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('brands'); }}>
+        <a href="/markalar" className={`nav-link${activeView === 'markalar' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('brands'); }}>
           <Editable value={nb.navLinks.brands} path={['navbar', 'navLinks', 'brands']} />
         </a>
-        <a href="/" className={`nav-link${activeView === 'uzman' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('uzman'); }}>
+        <a href="/uzman-gorusleri" className={`nav-link${activeView === 'uzman' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('uzman'); }}>
           <Editable value={nb.navLinks.uzman} path={['navbar', 'navLinks', 'uzman']} />
         </a>
-        <a href="/" className={`nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
+        <a href="/masraf" className={`nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
           <Editable value={nb.navLinks.masraf} path={['navbar', 'navLinks', 'masraf']} />
         </a>
       </div>
@@ -164,7 +173,7 @@ function FilterRow({ label, isOpen, onToggle, hasValue, children }) {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpenAdvanced, isMobile, onNavAction, activeView, categories, motorTypes }) {
   const [open, setOpen] = useState({
-    brand: false, category: false, motorType: false, risk: false
+    brand: false, model: false, category: false, motorType: false, risk: false
   });
 
   const toggle = (key) => setOpen(p => ({ ...p, [key]: !p[key] }));
@@ -177,7 +186,7 @@ function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpen
       kmMin: '', category: '', costMin: '', costMax: '', risk: '', minReports: ''
     });
     setOpen({
-      brand: false, category: false, motorType: false, risk: false
+      brand: false, model: false, category: false, motorType: false, risk: false
     });
   };
 
@@ -187,6 +196,13 @@ function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpen
 
   const brandCounts = useMemo(() => {
     const m = {}; allData.forEach(f => { m[f.brand] = (m[f.brand] || 0) + 1; }); return m;
+  }, [allData]);
+  const modelCounts = useMemo(() => {
+    const m = {};
+    popularModelTags.forEach(model => {
+      m[model] = allData.filter(f => matchesModelQuery(f, model)).length;
+    });
+    return m;
   }, [allData]);
   const catCounts = useMemo(() => {
     const m = {}; allData.forEach(f => { m[f.category] = (m[f.category] || 0) + 1; }); return m;
@@ -213,13 +229,13 @@ function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpen
           <a href="/" className={`sidebar-nav-link${activeView === 'home' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('reset'); }}>
             <span>🏠</span> {nb.navLinks.home}
           </a>
-          <a href="/" className={`sidebar-nav-link${activeView === 'markalar' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('brands'); }}>
+          <a href="/markalar" className={`sidebar-nav-link${activeView === 'markalar' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('brands'); }}>
             <span>🏢</span> {nb.navLinks.brands}
           </a>
-          <a href="/" className={`sidebar-nav-link${activeView === 'uzman' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('uzman'); }}>
+          <a href="/uzman-gorusleri" className={`sidebar-nav-link${activeView === 'uzman' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('uzman'); }}>
             <span>🔍</span> {nb.navLinks.uzman}
           </a>
-          <a href="/" className={`sidebar-nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
+          <a href="/masraf" className={`sidebar-nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
             <span>💰</span> {nb.navLinks.masraf}
           </a>
           <div className="sidebar-divider" style={{ margin: '15px 0' }} />
@@ -239,7 +255,16 @@ function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpen
         ))}
       </FilterRow>
 
-      {/* 2. Arıza Kategorisi */}
+      {/* 2. Model */}
+      <FilterRow label="Model" isOpen={open.model} onToggle={() => toggle('model')} hasValue={!!filters.model}>
+        {popularModelTags.map(model => (
+          <div key={model} className={`filter-option${filters.model === model ? ' selected' : ''}`} onClick={() => setFilter('model', model)}>
+            {model} <span className="opt-count">{modelCounts[model] || 0}</span>
+          </div>
+        ))}
+      </FilterRow>
+
+      {/* 3. Arıza Kategorisi */}
       <FilterRow label="Arıza Kategorisi" isOpen={open.category} onToggle={() => toggle('category')} hasValue={!!filters.category}>
         {categoryList.map(c => (
           <div key={c} className={`filter-option${filters.category === c ? ' selected' : ''}`} onClick={() => setFilter('category', c)}>
@@ -248,7 +273,7 @@ function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpen
         ))}
       </FilterRow>
 
-      {/* 3. Motor Tipi */}
+      {/* 4. Motor Tipi */}
       <FilterRow label="Motor Tipi" isOpen={open.motorType} onToggle={() => toggle('motorType')} hasValue={!!filters.motorType}>
         {motorTypeList.map(mt => (
           <div key={mt} className={`filter-option${filters.motorType === mt ? ' selected' : ''}`} onClick={() => setFilter('motorType', mt)}>
@@ -257,7 +282,7 @@ function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpen
         ))}
       </FilterRow>
 
-      {/* 4. Risk Seviyesi */}
+      {/* 5. Risk Seviyesi */}
       <FilterRow label="Risk Seviyesi" isOpen={open.risk} onToggle={() => toggle('risk')} hasValue={!!filters.risk}>
         {riskLevels.map(r => (
           <div key={r} className={`filter-option${filters.risk === r ? ' selected' : ''}`} onClick={() => setFilter('risk', r)}>
@@ -428,11 +453,12 @@ const CAT_ICONS = {
 };
 
 // ── Fault Card (forum thread row style) ───────────────────────────────────────────
-function FaultCard({ fault, user, onAuthRequest, onModelClick, onEdit, onDelete, adminMode, onClick, commentCount: commentCountProp }) {
+function FaultCard({ fault, user, onAuthRequest, onModelClick, onEdit, onDelete, adminMode, onClick, commentCount: commentCountProp, activity }) {
   const { editMode } = useLiveEdit();
   const showAdmin = adminMode && editMode;
   const catIcon = CAT_ICONS[fault.category] || '🔧';
   const commentCount = commentCountProp != null ? commentCountProp : getCommentCount(fault.id);
+  const faultActivity = activity || getFaultActivityInfo(fault);
 
   return (
     <article 
@@ -457,6 +483,8 @@ function FaultCard({ fault, user, onAuthRequest, onModelClick, onEdit, onDelete,
             </span>
             <span className="thread-header-dot">·</span>
             <h2 className="thread-title">{fault.description}</h2>
+            <span className="thread-header-dot">·</span>
+            <span className="thread-date" title={`Son hareket: ${faultActivity.exact}`}>{faultActivity.fullLabel}</span>
           </div>
           <div className="thread-meta">
             <span className="thread-cat-badge">{fault.category}</span>
@@ -523,6 +551,7 @@ function FaultCard({ fault, user, onAuthRequest, onModelClick, onEdit, onDelete,
 function ActivePills({ filters, onFilters }) {
   const pills = [];
   if (filters.brand) pills.push({ label: `Marka: ${filters.brand}`, key: 'brand' });
+  if (filters.model) pills.push({ label: `Model: ${filters.model}`, key: 'model' });
   if (filters.risk) pills.push({ label: `Risk: ${filters.risk}`, key: 'risk' });
   if (filters.category) pills.push({ label: `Kategori: ${filters.category}`, key: 'category' });
   if (filters.costMin) pills.push({ label: `Min Masraf: ₺${fmt(filters.costMin)}`, key: 'costMin' });
@@ -592,6 +621,80 @@ const safeGetHistoryState = () => {
   return null;
 };
 
+const EMPTY_FILTERS = {
+  brand: '', model: '', yearMin: '', yearMax: '', motorType: '',
+  kmMin: '', category: '', costMin: '', costMax: '', risk: '', minReports: ''
+};
+
+const VIEW_PATHS = {
+  home: '/',
+  markalar: '/markalar',
+  uzman: '/uzman-gorusleri',
+  masraf: '/masraf',
+};
+
+function slugify(value) {
+  return String(value || '')
+    .trim()
+    .replace(/ğ/g, 'g').replace(/Ğ/g, 'g')
+    .replace(/ü/g, 'u').replace(/Ü/g, 'u')
+    .replace(/ş/g, 's').replace(/Ş/g, 's')
+    .replace(/ı/g, 'i').replace(/İ/g, 'i')
+    .replace(/ö/g, 'o').replace(/Ö/g, 'o')
+    .replace(/ç/g, 'c').replace(/Ç/g, 'c')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'kayit';
+}
+
+function makeFaultPath(fault) {
+  const title = `${fault.brand || ''} ${fault.model || ''} ${fault.fault || fault.description || ''}`;
+  return `/ariza/${slugify(title)}-${fault.id}`;
+}
+
+function makeModelPath(model) {
+  return `/model/${slugify(model)}`;
+}
+
+function findModelBySlug(slug, faults = [], models = {}) {
+  const names = [...new Set([
+    ...Object.keys(models || {}),
+    ...faults.map(f => f.model),
+  ].filter(Boolean))];
+  return names.find(name => slugify(name) === slug) || null;
+}
+
+function routeStateFromPath(faults = [], models = {}) {
+  if (typeof window === 'undefined') return null;
+  const pathname = decodeURIComponent(window.location.pathname || '/').replace(/\/+$/, '') || '/';
+
+  if (pathname === '/markalar') return { activeView: 'markalar', selectedModel: null, selectedFaultId: null, forceExplorer: false };
+  if (pathname === '/uzman-gorusleri') return { activeView: 'uzman', selectedModel: null, selectedFaultId: null, forceExplorer: false };
+  if (pathname === '/masraf') return { activeView: 'masraf', selectedModel: null, selectedFaultId: null, forceExplorer: false };
+  if (pathname === '/arizalar') return { activeView: 'home', selectedModel: null, selectedFaultId: null, forceExplorer: true };
+
+  if (pathname.startsWith('/ariza/')) {
+    const segment = pathname.split('/').filter(Boolean).pop() || '';
+    const id = segment.split('-').pop();
+    return { activeView: 'home', selectedModel: null, selectedFaultId: id, forceExplorer: false };
+  }
+
+  if (pathname.startsWith('/model/')) {
+    const slug = pathname.split('/').filter(Boolean).pop() || '';
+    return {
+      activeView: 'home',
+      selectedModel: findModelBySlug(slug, faults, models),
+      selectedModelSlug: slug,
+      selectedFaultId: null,
+      forceExplorer: false,
+    };
+  }
+
+  return null;
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 function AppContent() {
   const {
@@ -624,13 +727,24 @@ function AppContent() {
         setMotorTypes(loadedMotors);
         setForum(loadedForum);
 
-        // Restore selected fault if a selectedFaultId is in the history state
-        const stateId = safeGetHistoryState()?.selectedFaultId;
+        const initialNav = routeStateFromPath(loadedData, loadedModels) || safeGetHistoryState();
+        const stateId = initialNav?.selectedFaultId;
+        if (initialNav) {
+          setActiveView(initialNav.activeView || 'home');
+          setSelectedModel(initialNav.selectedModel || (initialNav.selectedModelSlug ? findModelBySlug(initialNav.selectedModelSlug, loadedData, loadedModels) : null));
+          setForceExplorer(Boolean(initialNav.forceExplorer));
+          setSearch(initialNav.search || '');
+          if (initialNav.filters && typeof initialNav.filters === 'object') {
+            setFilters(initialNav.filters);
+          }
+        }
         if (stateId) {
           const found = loadedData.find(f => String(f.id) === String(stateId));
           if (found) {
             setSelectedFault(found);
           }
+        } else if (initialNav?.selectedFaultId === null) {
+          setSelectedFault(null);
         }
       } catch (err) {
         console.error("Failed to load initial data", err);
@@ -642,24 +756,22 @@ function AppContent() {
   }, []);
 
   const historyState = safeGetHistoryState();
+  const initialRouteState = routeStateFromPath() || historyState || {};
 
-  const [search, setSearch] = useState(() => historyState?.search || '');
+  const [search, setSearch] = useState(() => initialRouteState.search || '');
   const [sort, setSort] = useState('reports-desc');
-  const [filters, setFilters] = useState(() => historyState?.filters || {
-    brand: '', model: '', yearMin: '', yearMax: '', motorType: '',
-    kmMin: '', category: '', costMin: '', costMax: '', risk: '', minReports: ''
-  });
+  const [filters, setFilters] = useState(() => initialRouteState.filters || EMPTY_FILTERS);
   const [editFault, setEditFault] = useState(null);
   const [toast, setToast] = useState(null);
   const [user, setUser] = useState(() => loadUser());
   const [authModal, setAuthModal] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(() => historyState?.selectedModel || null);
+  const [selectedModel, setSelectedModel] = useState(() => initialRouteState.selectedModel || null);
   const [selectedFault, setSelectedFault] = useState(null);
-  const [activeView, setActiveView] = useState(() => historyState?.activeView || 'home');
+  const [activeView, setActiveView] = useState(() => initialRouteState.activeView || 'home');
   const [editModel, setEditModel] = useState(null);
-  const [forceExplorer, setForceExplorer] = useState(() => historyState?.forceExplorer || false);
+  const [forceExplorer, setForceExplorer] = useState(() => initialRouteState.forceExplorer || false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(20);
   const PAGE_SIZE = 20;
@@ -668,14 +780,27 @@ function AppContent() {
   // ── Browser history helpers ────────────────────────────────────────────────
   const skipPushRef = useRef(false); // flag to skip pushState during popstate handling
 
+  const buildRoutePath = useCallback((state) => {
+    if (state.selectedFaultId) {
+      const fault = data.find(f => String(f.id) === String(state.selectedFaultId))
+        || (selectedFault && String(selectedFault.id) === String(state.selectedFaultId) ? selectedFault : null);
+      return fault ? makeFaultPath(fault) : `/ariza/${state.selectedFaultId}`;
+    }
+    if (state.selectedModel) return makeModelPath(state.selectedModel);
+    if (state.activeView && state.activeView !== 'home') return VIEW_PATHS[state.activeView] || '/';
+    const hasFilters = Object.values(state.filters || {}).some(v => v !== '');
+    if (state.forceExplorer || state.search || hasFilters) return '/arizalar';
+    return '/';
+  }, [data, selectedFault]);
+
   const buildNavState = useCallback(() => ({
     activeView,
     selectedModel,
-    selectedFaultId: selectedFault?.id || null,
+    selectedFaultId: selectedFault?.id || routeStateFromPath(data, models)?.selectedFaultId || null,
     forceExplorer,
     search,
     filters,
-  }), [activeView, selectedModel, selectedFault, forceExplorer, search, filters]);
+  }), [activeView, selectedModel, selectedFault, forceExplorer, search, filters, data, models]);
 
   // Push a new history entry whenever a meaningful navigation happens
   const pushNav = useCallback((overrides = {}) => {
@@ -688,47 +813,43 @@ function AppContent() {
       search: overrides.search !== undefined ? overrides.search : search,
       filters: overrides.filters !== undefined ? overrides.filters : filters,
     };
-    window.history.pushState(state, '');
-  }, [activeView, selectedModel, selectedFault, forceExplorer, search, filters]);
+    window.history.pushState(state, '', buildRoutePath(state));
+  }, [activeView, selectedModel, selectedFault, forceExplorer, search, filters, buildRoutePath]);
 
   // Replace initial history entry so back from first page works
   useEffect(() => {
     try {
       if (typeof window !== 'undefined' && window.history && !window.history.state) {
-        window.history.replaceState(buildNavState(), '');
+        const routeState = routeStateFromPath(data, models);
+        const state = routeState ? { ...buildNavState(), ...routeState } : buildNavState();
+        const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.history.replaceState(state, '', routeState ? currentUrl : buildRoutePath(state));
       }
     } catch (e) {
       console.error("Error setting initial replaceState:", e);
     }
-  }, [buildNavState]); // only on mount if state is empty
+  }, [buildNavState, buildRoutePath, data, models]); // only acts while state is empty
 
   // Listen for browser back/forward
   useEffect(() => {
     const handlePopState = (e) => {
       try {
-        const s = e.state;
-        if (!s || typeof s !== 'object') {
-          // No state = initial page, go to landing
-          skipPushRef.current = true;
-          setActiveView('home');
-          setSelectedModel(null);
-          setSelectedFault(null);
-          setForceExplorer(false);
-          setSearch('');
-          setFilters({ brand: '', model: '', yearMin: '', yearMax: '', motorType: '', kmMin: '', category: '', costMin: '', costMax: '', risk: '', minReports: '' });
-          skipPushRef.current = false;
-          return;
-        }
+        const fallbackState = routeStateFromPath(data, models) || {
+          activeView: 'home',
+          selectedModel: null,
+          selectedFaultId: null,
+          forceExplorer: false,
+          search: '',
+          filters: EMPTY_FILTERS,
+        };
+        const s = e.state && typeof e.state === 'object' ? e.state : fallbackState;
         skipPushRef.current = true;
         setActiveView(s.activeView || 'home');
-        setSelectedModel(s.selectedModel || null);
+        setSelectedModel(s.selectedModel || (s.selectedModelSlug ? findModelBySlug(s.selectedModelSlug, data, models) : null));
         // Restore selectedFault from ID
         if (s.selectedFaultId) {
-          setSelectedFault(prev => {
-            // Try to find fault from current data
-            const found = data.find(f => String(f.id) === String(s.selectedFaultId));
-            return found || prev;
-          });
+          const found = data.find(f => String(f.id) === String(s.selectedFaultId));
+          setSelectedFault(found || null);
         } else {
           setSelectedFault(null);
         }
@@ -736,15 +857,18 @@ function AppContent() {
         setSearch(s.search || '');
         if (s.filters && typeof s.filters === 'object') {
           setFilters(s.filters);
+        } else {
+          setFilters(EMPTY_FILTERS);
         }
         skipPushRef.current = false;
       } catch (err) {
         console.error("Error in popstate handler:", err);
+        skipPushRef.current = false;
       }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [data]);
+  }, [data, models]);
 
   const openSuggest = () => {
     // Yönetici: doğrudan yayınla; onay kuyruğuna gönderme
@@ -791,7 +915,7 @@ function AppContent() {
     setSelectedModel(null);
     setSelectedFault(null);
     setSidebarOpen(false);
-    const emptyFilters = { brand: '', model: '', yearMin: '', yearMax: '', motorType: '', kmMin: '', category: '', costMin: '', costMax: '', risk: '', minReports: '' };
+    const emptyFilters = EMPTY_FILTERS;
     if (action === 'reset') {
       setActiveView('home');
       setSearch('');
@@ -817,7 +941,7 @@ function AppContent() {
 
   const persistFaults = useCallback(async (next) => {
     setData(next);
-    await saveAdminFaults(next);
+    return saveAdminFaults(next);
   }, []);
 
   const handleLogin = (u) => { setUser(u); setToast(`Hoş geldiniz, ${u.username}!`); };
@@ -832,17 +956,22 @@ function AppContent() {
   const filtered = useMemo(() => {
     let d = data;
     if (search.trim()) {
-      const q = search.toLowerCase();
-      d = d.filter(f =>
-        f.brand.toLowerCase().includes(q) ||
-        f.model.toLowerCase().includes(q) ||
-        f.fault.toLowerCase().includes(q) ||
-        (f.symptoms || '').toLowerCase().includes(q) ||
-        f.category.toLowerCase().includes(q)
-      );
+      const q = search.trim().toLowerCase();
+      d = d.filter(f => {
+        const brand = f.brand.toLowerCase();
+        const model = f.model.toLowerCase();
+        return (
+          brand.includes(q) ||
+          model.includes(q) ||
+          `${brand} ${model}`.includes(q) ||
+          f.fault.toLowerCase().includes(q) ||
+          (f.symptoms || '').toLowerCase().includes(q) ||
+          f.category.toLowerCase().includes(q)
+        );
+      });
     }
     if (filters.brand) d = d.filter(f => f.brand === filters.brand);
-    if (filters.model) d = d.filter(f => f.model.toLowerCase().includes(filters.model.toLowerCase()));
+    if (filters.model) d = d.filter(f => matchesModelQuery(f, filters.model));
     if (filters.yearMin) d = d.filter(f => f.yearMax >= Number(filters.yearMin));
     if (filters.yearMax) d = d.filter(f => f.yearMin <= Number(filters.yearMax));
     if (filters.motorType) d = d.filter(f => f.motorType === filters.motorType);
@@ -864,6 +993,14 @@ function AppContent() {
   const commentCountMap = useMemo(() => {
     return buildCommentCountMap(data.map(f => f.id), forum);
   }, [data, forum]);
+
+  const faultActivityMap = useMemo(() => {
+    return buildFaultActivityMap(data, forum);
+  }, [data, forum]);
+
+  const handleForumChange = useCallback((nextForum) => {
+    setForum(nextForum || {});
+  }, []);
 
   // ── Loading screen (MUST be after all hooks to avoid Rules of Hooks violation) ──
   if (loading) {
@@ -905,7 +1042,7 @@ function AppContent() {
     const next = idx >= 0
       ? data.map((f, i) => (String(f.id) === String(normalized.id) ? normalized : f))
       : [normalized, ...data];
-    await persistFaults(next);
+    const savedRemotely = await persistFaults(next);
     if (pendingId) {
       try {
         const pendingList = await loadPending();
@@ -919,7 +1056,15 @@ function AppContent() {
     if (selectedFault && String(selectedFault.id) === String(normalized.id)) {
       setSelectedFault(normalized);
     }
-    setToast(pendingId ? 'Öneri yayınlandı!' : 'Arıza kaydedildi!');
+    if (savedRemotely) {
+      setToast(pendingId ? 'Öneri yayınlandı!' : 'Arıza kaydedildi!');
+    } else {
+      setToast(pendingId
+        ? 'Öneri bu tarayıcıda yayınlandı; sunucuya yazılamadı.'
+        : 'Arıza bu tarayıcıda kaydedildi; sunucuya yazılamadı.'
+      );
+    }
+    return savedRemotely;
   };
 
   const handleDeleteFault = async (id) => {
@@ -988,6 +1133,7 @@ function AppContent() {
           <main className="main main-detail">
             <FaultDetailPage
               fault={selectedFault}
+              activity={faultActivityMap[selectedFault.id]}
               user={user}
               onAuthRequest={() => openAuth('login')}
               onBack={() => { setSelectedFault(null); pushNav({ selectedFaultId: null }); }}
@@ -1006,6 +1152,7 @@ function AppContent() {
                 setSelectedFault(updated);
               }}
               onSuggestFault={openSuggest}
+              onForumChange={handleForumChange}
             />
           </main>
         </div>
@@ -1016,12 +1163,14 @@ function AppContent() {
               model={selectedModel}
               models={models}
               faults={data}
+              activityMap={faultActivityMap}
               adminMode={adminMode}
               onBack={() => { setSelectedModel(null); pushNav({ selectedModel: null }); }}
               onEditModel={(key, data) => setEditModel({ key, data })}
               onCreateModel={() => setEditModel({ key: selectedModel, data: null })}
               user={user}
               onAuthRequest={() => openAuth('login')}
+              onForumChange={handleForumChange}
             />
           </main>
         </div>
@@ -1057,6 +1206,7 @@ function AppContent() {
           <LandingPage
             data={data}
             models={models}
+            activityMap={faultActivityMap}
             onBrandSelect={(brand) => {
               const newFilters = { ...filters, brand };
               setFilters(newFilters);
@@ -1067,7 +1217,13 @@ function AppContent() {
             onFaultClick={(f) => { setSelectedFault(f); pushNav({ selectedFaultId: f.id }); }}
             onSearch={(val) => {
               setSearch(val);
-              if (val) setForceExplorer(true);
+              setSelectedModel(null);
+              setSelectedFault(null);
+              setActiveView('home');
+              if (val) {
+                setForceExplorer(true);
+                pushNav({ activeView: 'home', selectedModel: null, selectedFaultId: null, forceExplorer: true, search: val });
+              }
             }}
             onExploreAll={() => { setForceExplorer(true); pushNav({ forceExplorer: true }); }}
             onSuggestFault={openSuggest}
@@ -1148,6 +1304,7 @@ function AppContent() {
                       onDelete={handleDeleteFault}
                       onClick={(f) => { setSelectedFault(f); pushNav({ selectedFaultId: f.id }); }}
                       commentCount={commentCountMap[f.id] || 0}
+                      activity={faultActivityMap[f.id]}
                     />
                   ))}
                 </div>

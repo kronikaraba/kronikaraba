@@ -1,4 +1,6 @@
-export const faultData = [
+import { popularFaultData2026 } from './popularFaults2026.js';
+
+const baseFaultData = [
   {
     id: 1,
     brand: "Volkswagen",
@@ -315,6 +317,8 @@ export const faultData = [
     category: "Süspansiyon",
   },
 ];
+
+export const faultData = [...baseFaultData, ...popularFaultData2026];
 
 export const brands = [...new Set(faultData.map(f => f.brand))].sort();
 export const categories = [...new Set(faultData.map(f => f.category))].sort();

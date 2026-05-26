@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { loadPending, savePending, loadForum, saveForum } from './adminStorage.js';
 import { loadCategories, saveCategories, loadMotorTypes, saveMotorTypes } from './siteContent.js';
 import { normalizeFault, getPendingId, getFaultCompletenessWarnings } from './faultUtils.js';
+import { formatDateTimeMinute, getCommentDateLabel } from './dateUtils.js';
 
 const TABS = [
   { key: 'pending', label: 'Öneriler' },
@@ -222,7 +223,7 @@ export default function AdminHub({
                       <p className="admin-hub-meta">
                         {p._submittedBy || p.suggestedBy || 'Anonim'}
                         {' · '}
-                        {p._submittedAt || (p.suggestedAt ? new Date(p.suggestedAt).toLocaleDateString('tr-TR') : '')}
+                        {formatDateTimeMinute(p._submittedAt || p.suggestedAt, pid)}
                         {p.category ? ` · ${p.category}` : ''}
                       </p>
                       {warnings.length > 0 && (
@@ -282,7 +283,7 @@ export default function AdminHub({
                             <span className="admin-hub-type-tag">{POST_TYPE_LABELS[p.type] || p.type}</span>
                           )}
                         </span>
-                        <span className="admin-hub-meta">{p.username} · {p.date}</span>
+                        <span className="admin-hub-meta">{p.username} · {getCommentDateLabel(p)}</span>
                       </div>
                       <p className="admin-hub-fault-ref" title={p.faultTitle || p.faultLabel}>{p.faultLabel}</p>
                       {p.text ? <p>{p.text}</p> : null}
