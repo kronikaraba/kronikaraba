@@ -4,7 +4,7 @@ export const config = {
   maxDuration: 30,
 };
 
-const VALID_KEYS = ['faults', 'models', 'pending', 'forum', 'users', 'content', 'categories', 'motorTypes'];
+const VALID_KEYS = ['faults', 'models', 'pending', 'forum', 'users', 'content', 'categories', 'motorTypes', 'articles'];
 
 /**
  * Vercel Serverless Function — Centralized JSON data store

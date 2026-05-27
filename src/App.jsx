@@ -5,13 +5,15 @@ import { AuthModal, loadUser, logout } from './auth.jsx';
 import { CommentSection, getCommentCount, buildCommentCountMap, buildFaultActivityMap } from './comments.jsx';
 import ModelDetailPage from './ModelDetailPage.jsx';
 import FaultDetailPage from './FaultDetailPage.jsx';
-import { loadAdminFaults, saveAdminFaults, loadAdminModels, saveAdminModels, loadPending, savePending, loadForum } from './adminStorage.js';
+import { loadAdminFaults, saveAdminFaults, loadAdminModels, saveAdminModels, loadPending, savePending, loadForum, loadArticles, saveArticles } from './adminStorage.js';
 import { normalizeFault, getPendingId } from './faultUtils.js';
 import { LiveEditProvider, Editable, useLiveEdit } from './liveEdit.jsx';
 import FaultEditModal from './faultEditModal.jsx';
 import ModelEditModal from './modelEditModal.jsx';
 import AdminHub from './adminHub.jsx';
 import { MarkalarlPage, UzmanPage, MasrafPage } from './Pages.jsx';
+import ArticlesPage from './ArticlesPage.jsx';
+import ArticleEditModal from './ArticleEditModal.jsx';
 import LandingPage from './LandingPage.jsx';
 import UserFaultSuggestModal from './UserFaultSuggestModal.jsx';
 import { getFaultActivityInfo } from './dateUtils.js';
@@ -63,6 +65,9 @@ function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, o
         </a>
         <a href="/masraf" className={`nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
           <Editable value={nb.navLinks.masraf} path={['navbar', 'navLinks', 'masraf']} />
+        </a>
+        <a href="/makaleler" className={`nav-link nav-link-articles${activeView === 'articles' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('articles'); }}>
+          <Editable value={nb.navLinks.articles || 'Makaleler'} path={['navbar', 'navLinks', 'articles']} />
         </a>
       </div>
 
@@ -237,6 +242,9 @@ function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpen
           </a>
           <a href="/masraf" className={`sidebar-nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
             <span>💰</span> {nb.navLinks.masraf}
+          </a>
+          <a href="/makaleler" className={`sidebar-nav-link sidebar-nav-link-articles${activeView === 'articles' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('articles'); }}>
+            <span>📰</span> {nb.navLinks.articles || 'Makaleler'}
           </a>
           <div className="sidebar-divider" style={{ margin: '15px 0' }} />
         </div>
@@ -631,6 +639,7 @@ const VIEW_PATHS = {
   markalar: '/markalar',
   uzman: '/uzman-gorusleri',
   masraf: '/masraf',
+  articles: '/makaleler',
 };
 
 function slugify(value) {
@@ -673,6 +682,7 @@ function routeStateFromPath(faults = [], models = {}) {
   if (pathname === '/markalar') return { activeView: 'markalar', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/uzman-gorusleri') return { activeView: 'uzman', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/masraf') return { activeView: 'masraf', selectedModel: null, selectedFaultId: null, forceExplorer: false };
+  if (pathname === '/makaleler') return { activeView: 'articles', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/arizalar') return { activeView: 'home', selectedModel: null, selectedFaultId: null, forceExplorer: true };
 
   if (pathname.startsWith('/ariza/')) {
@@ -709,23 +719,26 @@ function AppContent() {
   const [categories, setCategories] = useState([]);
   const [motorTypes, setMotorTypes] = useState([]);
   const [forum, setForum] = useState({});
+  const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function initAll() {
       try {
-        const [loadedData, loadedModels, loadedCats, loadedMotors, loadedForum] = await Promise.all([
+        const [loadedData, loadedModels, loadedCats, loadedMotors, loadedForum, loadedArticles] = await Promise.all([
           loadAdminFaults(),
           loadAdminModels(),
           loadCategories(),
           loadMotorTypes(),
-          loadForum()
+          loadForum(),
+          loadArticles()
         ]);
         setData(loadedData);
         setModels(loadedModels);
         setCategories(loadedCats);
         setMotorTypes(loadedMotors);
         setForum(loadedForum);
+        setArticles(loadedArticles);
 
         const initialNav = routeStateFromPath(loadedData, loadedModels) || safeGetHistoryState();
         const stateId = initialNav?.selectedFaultId;
@@ -771,11 +784,13 @@ function AppContent() {
   const [selectedFault, setSelectedFault] = useState(null);
   const [activeView, setActiveView] = useState(() => initialRouteState.activeView || 'home');
   const [editModel, setEditModel] = useState(null);
+  const [editArticle, setEditArticle] = useState(null);
   const [forceExplorer, setForceExplorer] = useState(() => initialRouteState.forceExplorer || false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(20);
   const PAGE_SIZE = 20;
   const adminMode = authed && editMode;
+  const articleAdminMode = authed || user?.isAdmin === true;
 
   // ── Browser history helpers ────────────────────────────────────────────────
   const skipPushRef = useRef(false); // flag to skip pushState during popstate handling
@@ -888,6 +903,7 @@ function AppContent() {
       markalar: 'Markalar | KronikAraba',
       uzman: 'Uzman Görüşleri | KronikAraba',
       masraf: 'Masraf Hesaplama | KronikAraba',
+      articles: 'Makaleler | KronikAraba',
     };
     document.title = titles[activeView] || titles.home;
   }, [activeView]);
@@ -932,6 +948,9 @@ function AppContent() {
     } else if (action === 'masraf') {
       setActiveView('masraf');
       pushNav({ activeView: 'masraf', selectedModel: null, selectedFaultId: null });
+    } else if (action === 'articles') {
+      setActiveView('articles');
+      pushNav({ activeView: 'articles', selectedModel: null, selectedFaultId: null });
     }
   }, [pushNav]);
 
@@ -1093,6 +1112,20 @@ function AppContent() {
     setToast('Model makalesi kaydedildi!');
   };
 
+  const handleSaveArticle = async (article) => {
+    const exists = articles.some(a => String(a.id) === String(article.id));
+    const next = exists
+      ? articles.map(a => (String(a.id) === String(article.id) ? article : a))
+      : [article, ...articles];
+    setArticles(next);
+    const savedRemotely = await saveArticles(next);
+    setEditArticle(null);
+    setToast(savedRemotely
+      ? 'Makale kaydedildi!'
+      : 'Makale bu tarayıcıda kaydedildi; sunucuya yazılamadı.'
+    );
+  };
+
   const notify = (msg) => setToast(msg);
   const home = content.home;
 
@@ -1199,6 +1232,17 @@ function AppContent() {
         <div className="layout layout-detail">
           <main className="main main-detail" style={{ maxWidth: 1000 }}>
             <MasrafPage data={data} content={content} onModelClick={(m) => { setSelectedModel(m); pushNav({ selectedModel: m }); }} />
+          </main>
+        </div>
+      ) : activeView === 'articles' ? (
+        <div className="layout layout-detail">
+          <main className="main main-detail" style={{ maxWidth: 1040 }}>
+            <ArticlesPage
+              articles={articles}
+              adminMode={articleAdminMode}
+              onNewArticle={() => setEditArticle('new')}
+              onEditArticle={setEditArticle}
+            />
           </main>
         </div>
       ) : showLanding ? (
@@ -1344,6 +1388,13 @@ function AppContent() {
           faults={data}
           onSave={handleSaveModel}
           onClose={() => setEditModel(null)}
+        />
+      )}
+      {editArticle && (
+        <ArticleEditModal
+          article={editArticle === 'new' ? null : editArticle}
+          onSave={handleSaveArticle}
+          onClose={() => setEditArticle(null)}
         />
       )}
       <AdminHub

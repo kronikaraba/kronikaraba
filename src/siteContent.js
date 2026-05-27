@@ -11,6 +11,7 @@ export const defaultSiteContent = {
       brands: 'Markalar',
       uzman:  'Usta Yorumları',
       masraf: 'Masraf Rehberi',
+      articles: 'Makaleler',
     },
   },
   home: {

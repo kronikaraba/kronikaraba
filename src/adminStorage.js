@@ -1,5 +1,6 @@
 import { faultData as defaultFaults } from './data.js';
 import { modelDetails as defaultModelDetails } from './modelData.js';
+import { defaultArticles } from './articleData.js';
 
 export const ADMIN_KEY = 'ka_admin_session';
 export const ADMIN_PASS_KEY = 'ka_admin_password';
@@ -125,6 +126,16 @@ export async function loadAdminModels() {
 
 export async function saveAdminModels(data) {
   return apiSave('models', data);
+}
+
+// Articles
+export async function loadArticles() {
+  const data = await apiLoad('articles');
+  return data || defaultArticles;
+}
+
+export async function saveArticles(data) {
+  return apiSave('articles', data);
 }
 
 // Forum

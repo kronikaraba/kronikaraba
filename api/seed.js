@@ -1,6 +1,7 @@
 import { put, list } from '@vercel/blob';
 import { faultData } from '../src/data.js';
 import { modelDetails } from '../src/modelData.js';
+import { defaultArticles } from '../src/articleData.js';
 import { defaultCategories, defaultMotorTypes, defaultSiteContent } from '../src/siteContent.js';
 
 export const config = { maxDuration: 30 };
@@ -31,6 +32,7 @@ export default async function handler(req, res) {
     { key: 'content', data: defaultSiteContent },
     { key: 'categories', data: defaultCategories },
     { key: 'motorTypes', data: defaultMotorTypes },
+    { key: 'articles', data: defaultArticles },
   ];
 
   try {
