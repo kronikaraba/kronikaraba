@@ -1274,6 +1274,31 @@ h6 {
   border-color: var(--primary-dark);
 }
 
+.form-group .manual-model-toggle {
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--gray-500);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.form-group .manual-model-toggle input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--primary-dark);
+}
+
+.form-group .manual-model-toggle input:disabled + span {
+  opacity: 0.55;
+}
+
 .form-group textarea {
   resize: vertical;
   min-height: 80px;

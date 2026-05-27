@@ -23,9 +23,15 @@ function initForm(fault) {
   };
 }
 
-export default function FaultEditModal({ fault, allFaults, onSave, onClose, categories, motorTypes }) {
+export default function FaultEditModal({ fault, allFaults, onSave, onClose, categories, motorTypes, allowManualModel = false }) {
   const isPending = Boolean(fault?._pendingId);
   const [form, setForm] = useState(() => initForm(fault));
+  const [manualModel, setManualModel] = useState(() => (
+    allowManualModel
+    && Boolean(fault?.brand)
+    && Boolean(fault?.model)
+    && !allFaults.some(f => f.brand === fault.brand && f.model === fault.model)
+  ));
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -45,8 +51,13 @@ export default function FaultEditModal({ fault, allFaults, onSave, onClose, cate
     setForm(prev => ({
       ...prev,
       brand,
-      model: allFaults.some(f => f.brand === brand && f.model === prev.model) ? prev.model : '',
+      model: !manualModel && allFaults.some(f => f.brand === brand && f.model === prev.model) ? prev.model : '',
     }));
+  };
+
+  const toggleManualModel = (enabled) => {
+    setManualModel(enabled);
+    setForm(prev => ({ ...prev, model: '' }));
   };
 
   const costInvalid = Number(form.costMin) > 0 && Number(form.costMax) > 0 && Number(form.costMin) > Number(form.costMax);
@@ -104,10 +115,31 @@ export default function FaultEditModal({ fault, allFaults, onSave, onClose, cate
               </div>
               <div className="form-group">
                 <label>Model *</label>
-                <select value={form.model} onChange={e => set('model', e.target.value)} required disabled={!form.brand}>
-                  <option value="" disabled>Model seçin</option>
-                  {modelOptions.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
+                {manualModel ? (
+                  <input
+                    value={form.model}
+                    onChange={e => set('model', e.target.value)}
+                    placeholder="Model adını manuel girin"
+                    required
+                    disabled={!form.brand}
+                  />
+                ) : (
+                  <select value={form.model} onChange={e => set('model', e.target.value)} required disabled={!form.brand}>
+                    <option value="" disabled>Model seçin</option>
+                    {modelOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                )}
+                {allowManualModel && (
+                  <label className="manual-model-toggle">
+                    <input
+                      type="checkbox"
+                      checked={manualModel}
+                      onChange={e => toggleManualModel(e.target.checked)}
+                      disabled={!form.brand}
+                    />
+                    <span>Model listede yok, manuel gir</span>
+                  </label>
+                )}
               </div>
             </div>
             <div className="form-row">

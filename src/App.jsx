@@ -1333,6 +1333,7 @@ function AppContent() {
           onClose={() => setEditFault(null)}
           categories={categories}
           motorTypes={motorTypes}
+          allowManualModel={authed || user?.isAdmin === true}
         />
       )}
       {editModel && (
