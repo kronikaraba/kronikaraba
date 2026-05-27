@@ -32,8 +32,6 @@
   --navbar-h: 58px;
   --sidebar-w: 220px;
   --font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --live-edit-bar-h: 52px;
-  --live-edit-bar-h-active: 68px;
 }
 
 html {
@@ -1483,10 +1481,10 @@ h6 {
   top: calc(100% + 8px);
   background: var(--white);
   border: 1px solid var(--gray-200);
-  border-radius: 8px;
-  min-width: 170px;
+  border-radius: 10px;
+  min-width: 248px;
   z-index: 200;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.16);
   overflow: hidden;
   animation: fadeIn 0.12s ease;
 }
@@ -1517,6 +1515,63 @@ h6 {
   height: 1px;
   background: var(--gray-200);
   margin: 4px 0;
+}
+
+.user-dropdown-admin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px 6px;
+}
+
+.user-dropdown-admin-head span {
+  color: var(--gray-500);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.user-dropdown-admin-head strong {
+  color: var(--gray-900);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.user-dropdown-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px 10px 10px;
+}
+
+.user-dropdown-admin-grid + .user-dropdown-admin-grid {
+  padding-top: 0;
+}
+
+.user-dropdown-admin-grid button {
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--primary-dark);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background 0.13s, border-color 0.13s, color 0.13s;
+}
+
+.user-dropdown-admin-grid button:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--white);
+}
+
+.user-dropdown-admin-grid-wide button:last-child {
+  grid-column: 1 / -1;
 }
 
 /* ──── AUTH MODAL ──── */
@@ -4938,71 +4993,6 @@ h6 {
   -webkit-background-clip: unset !important;
 }
 
-.live-edit-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 9000;
-  background: #0f172a;
-  border-top: 2px solid var(--primary);
-  padding: 10px 16px;
-  min-height: var(--live-edit-bar-h);
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.25);
-}
-
-.live-edit-bar.active {
-  min-height: var(--live-edit-bar-h-active);
-  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-}
-
-.live-edit-bar-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.live-edit-status {
-  font-size: 13px;
-  font-weight: 600;
-  color: #f8fafc;
-}
-
-.live-edit-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.live-edit-btn {
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  border: none;
-  cursor: pointer;
-  background: var(--primary);
-  color: #0f172a;
-}
-
-.live-edit-btn:hover {
-  background: var(--primary-dark);
-}
-
-.live-edit-btn-out {
-  background: transparent;
-  color: #94a3b8;
-  border: 1px solid #475569;
-}
-
-.live-edit-btn-out:hover {
-  color: #f8fafc;
-  border-color: #94a3b8;
-}
-
 .live-ph-edit {
   position: absolute;
   top: -18px;
@@ -5068,14 +5058,6 @@ h6 {
 
 .navbar-btn-edit-only {
   cursor: text;
-}
-
-body:has(.live-edit-bar) {
-  padding-bottom: var(--live-edit-bar-h);
-}
-
-body:has(.live-edit-bar.active) {
-  padding-bottom: var(--live-edit-bar-h-active);
 }
 
 /* Admin hub drawer */
@@ -5532,17 +5514,6 @@ body:has(.forum-lightbox) {
   font-size: 12px;
   cursor: pointer;
   margin-bottom: 8px;
-}
-
-.live-edit-quick {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.live-edit-btn-sm {
-  padding: 6px 10px !important;
-  font-size: 11px !important;
 }
 
 .forum-admin-hint {

@@ -101,17 +101,6 @@ export function LiveEditProvider({ children }) {
       loginAdmin: handleLogin,
     }}>
       {children}
-      {authed && (
-        <LiveEditToolbar
-          editMode={editMode}
-          pendingCount={pendingCount}
-          onToggle={() => setEditMode(m => !m)}
-          onLogout={handleLogout}
-          onNewFault={() => (adminCallbacks.onNewFault || (() => {}))()}
-          onNewModel={() => (adminCallbacks.onNewModel || (() => {}))()}
-          onOpenHub={openHub}
-        />
-      )}
     </LiveEditContext.Provider>
   );
 }
@@ -139,35 +128,5 @@ export function Editable({ value, path, as: Tag = 'span', className = '', multil
     >
       {value}
     </Tag>
-  );
-}
-
-function LiveEditToolbar({ editMode, pendingCount, onToggle, onLogout, onNewFault, onNewModel, onOpenHub }) {
-  return (
-    <div className={`live-edit-bar${editMode ? ' active' : ''}`}>
-      <div className="live-edit-bar-inner">
-        <span className="live-edit-status">
-          {editMode ? '✏️ Düzenleme modu' : '👁 Önizleme'}
-        </span>
-        {editMode && (
-          <div className="live-edit-quick">
-            <button type="button" className="live-edit-btn live-edit-btn-sm" onClick={onNewFault}>+ Arıza</button>
-            <button type="button" className="live-edit-btn live-edit-btn-sm" onClick={onNewModel}>+ Model</button>
-            <button type="button" className="live-edit-btn live-edit-btn-sm" onClick={() => onOpenHub('forum')}>💬 Tartışma</button>
-            <button type="button" className="live-edit-btn live-edit-btn-sm" onClick={() => onOpenHub('pending')}>
-              📥 Öneriler{pendingCount > 0 ? ` (${pendingCount})` : ''}
-            </button>
-            <button type="button" className="live-edit-btn live-edit-btn-sm" onClick={() => onOpenHub('categories')}>🏷️</button>
-          </div>
-        )}
-        <div className="live-edit-actions">
-          <button type="button" className="live-edit-btn" onClick={() => onOpenHub('pending')}>Yönetim</button>
-          <button type="button" className="live-edit-btn" onClick={onToggle}>
-            {editMode ? 'Önizleme' : 'Düzenle'}
-          </button>
-          <button type="button" className="live-edit-btn live-edit-btn-out" onClick={onLogout}>Çıkış</button>
-        </div>
-      </div>
-    </div>
   );
 }

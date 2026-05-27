@@ -131,6 +131,13 @@ function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, o
 // ── UserMenu ─────────────────────────────────────────────────────────────────
 function UserMenu({ user, onLogout }) {
   const [open, setOpen] = useState(false);
+  const { authed, editMode, setEditMode, pendingCount, openHub, adminCallbacks } = useLiveEdit();
+  const isAdminUser = authed || user?.isAdmin === true;
+  const runAdminAction = (action) => {
+    action();
+    setOpen(false);
+  };
+
   return (
     <div className="user-menu">
       <button className="user-avatar-btn" onClick={() => setOpen(o => !o)}>
@@ -143,6 +150,32 @@ function UserMenu({ user, onLogout }) {
             👤 {user.username}
           </div>
           <div className="user-dropdown-item" style={{ fontSize: 11, color: 'var(--gray-400)', cursor: 'default' }}>{user.email}</div>
+          {isAdminUser && (
+            <>
+              <div className="user-dropdown-sep" />
+              <div className="user-dropdown-admin-head">
+                <span>Admin</span>
+                <strong>{editMode ? 'Düzenleme açık' : 'Önizleme modu'}</strong>
+              </div>
+              <div className="user-dropdown-admin-grid">
+                <button type="button" onClick={() => runAdminAction(() => openHub('pending'))}>Yönetim</button>
+                <button type="button" onClick={() => runAdminAction(() => setEditMode(m => !m))}>
+                  {editMode ? 'Önizleme' : 'Düzenle'}
+                </button>
+              </div>
+              {editMode && (
+                <div className="user-dropdown-admin-grid user-dropdown-admin-grid-wide">
+                  <button type="button" onClick={() => runAdminAction(() => (adminCallbacks.onNewFault || (() => {}))())}>Arıza ekle</button>
+                  <button type="button" onClick={() => runAdminAction(() => (adminCallbacks.onNewModel || (() => {}))())}>Model ekle</button>
+                  <button type="button" onClick={() => runAdminAction(() => openHub('forum'))}>Tartışma</button>
+                  <button type="button" onClick={() => runAdminAction(() => openHub('pending'))}>
+                    Öneriler{pendingCount > 0 ? ` (${pendingCount})` : ''}
+                  </button>
+                  <button type="button" onClick={() => runAdminAction(() => openHub('categories'))}>Listeler</button>
+                </div>
+              )}
+            </>
+          )}
           <div className="user-dropdown-sep" />
           <button className="user-dropdown-item danger" onClick={onLogout}>Çıkış Yap</button>
         </div>
