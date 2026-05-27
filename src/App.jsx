@@ -12,7 +12,7 @@ import FaultEditModal from './faultEditModal.jsx';
 import ModelEditModal from './modelEditModal.jsx';
 import AdminHub from './adminHub.jsx';
 import { MarkalarlPage, UzmanPage, MasrafPage } from './Pages.jsx';
-import ArticlesPage from './ArticlesPage.jsx';
+import ArticlesPage, { ArticleDetailPage } from './ArticlesPage.jsx';
 import ArticleEditModal from './ArticleEditModal.jsx';
 import LandingPage from './LandingPage.jsx';
 import UserFaultSuggestModal from './UserFaultSuggestModal.jsx';
@@ -66,7 +66,7 @@ function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, o
         <a href="/masraf" className={`nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
           <Editable value={nb.navLinks.masraf} path={['navbar', 'navLinks', 'masraf']} />
         </a>
-        <a href="/makaleler" className={`nav-link nav-link-articles${activeView === 'articles' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('articles'); }}>
+        <a href="/makaleler" className={`nav-link${activeView === 'articles' || activeView === 'articleDetail' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('articles'); }}>
           <Editable value={nb.navLinks.articles || 'Makaleler'} path={['navbar', 'navLinks', 'articles']} />
         </a>
       </div>
@@ -243,7 +243,7 @@ function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpen
           <a href="/masraf" className={`sidebar-nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
             <span>💰</span> {nb.navLinks.masraf}
           </a>
-          <a href="/makaleler" className={`sidebar-nav-link sidebar-nav-link-articles${activeView === 'articles' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('articles'); }}>
+          <a href="/makaleler" className={`sidebar-nav-link${activeView === 'articles' || activeView === 'articleDetail' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('articles'); }}>
             <span>📰</span> {nb.navLinks.articles || 'Makaleler'}
           </a>
           <div className="sidebar-divider" style={{ margin: '15px 0' }} />
@@ -640,6 +640,7 @@ const VIEW_PATHS = {
   uzman: '/uzman-gorusleri',
   masraf: '/masraf',
   articles: '/makaleler',
+  articleDetail: '/makaleler',
 };
 
 function slugify(value) {
@@ -683,6 +684,10 @@ function routeStateFromPath(faults = [], models = {}) {
   if (pathname === '/uzman-gorusleri') return { activeView: 'uzman', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/masraf') return { activeView: 'masraf', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/makaleler') return { activeView: 'articles', selectedModel: null, selectedFaultId: null, forceExplorer: false };
+  if (pathname.startsWith('/makaleler/')) {
+    const id = pathname.split('/').filter(Boolean).pop() || '';
+    return { activeView: 'articleDetail', selectedModel: null, selectedFaultId: null, selectedArticleId: id, forceExplorer: false };
+  }
   if (pathname === '/arizalar') return { activeView: 'home', selectedModel: null, selectedFaultId: null, forceExplorer: true };
 
   if (pathname.startsWith('/ariza/')) {
@@ -745,6 +750,7 @@ function AppContent() {
         if (initialNav) {
           setActiveView(initialNav.activeView || 'home');
           setSelectedModel(initialNav.selectedModel || (initialNav.selectedModelSlug ? findModelBySlug(initialNav.selectedModelSlug, loadedData, loadedModels) : null));
+          setSelectedArticleId(initialNav.selectedArticleId || null);
           setForceExplorer(Boolean(initialNav.forceExplorer));
           setSearch(initialNav.search || '');
           if (initialNav.filters && typeof initialNav.filters === 'object') {
@@ -785,6 +791,7 @@ function AppContent() {
   const [activeView, setActiveView] = useState(() => initialRouteState.activeView || 'home');
   const [editModel, setEditModel] = useState(null);
   const [editArticle, setEditArticle] = useState(null);
+  const [selectedArticleId, setSelectedArticleId] = useState(() => initialRouteState.selectedArticleId || null);
   const [forceExplorer, setForceExplorer] = useState(() => initialRouteState.forceExplorer || false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(20);
@@ -801,6 +808,7 @@ function AppContent() {
         || (selectedFault && String(selectedFault.id) === String(state.selectedFaultId) ? selectedFault : null);
       return fault ? makeFaultPath(fault) : `/ariza/${state.selectedFaultId}`;
     }
+    if (state.selectedArticleId) return `/makaleler/${encodeURIComponent(state.selectedArticleId)}`;
     if (state.selectedModel) return makeModelPath(state.selectedModel);
     if (state.activeView && state.activeView !== 'home') return VIEW_PATHS[state.activeView] || '/';
     const hasFilters = Object.values(state.filters || {}).some(v => v !== '');
@@ -812,10 +820,11 @@ function AppContent() {
     activeView,
     selectedModel,
     selectedFaultId: selectedFault?.id || routeStateFromPath(data, models)?.selectedFaultId || null,
+    selectedArticleId,
     forceExplorer,
     search,
     filters,
-  }), [activeView, selectedModel, selectedFault, forceExplorer, search, filters, data, models]);
+  }), [activeView, selectedModel, selectedFault, selectedArticleId, forceExplorer, search, filters, data, models]);
 
   // Push a new history entry whenever a meaningful navigation happens
   const pushNav = useCallback((overrides = {}) => {
@@ -824,12 +833,13 @@ function AppContent() {
       activeView: overrides.activeView ?? activeView,
       selectedModel: overrides.selectedModel !== undefined ? overrides.selectedModel : selectedModel,
       selectedFaultId: overrides.selectedFaultId !== undefined ? overrides.selectedFaultId : (selectedFault?.id || null),
+      selectedArticleId: overrides.selectedArticleId !== undefined ? overrides.selectedArticleId : selectedArticleId,
       forceExplorer: overrides.forceExplorer !== undefined ? overrides.forceExplorer : forceExplorer,
       search: overrides.search !== undefined ? overrides.search : search,
       filters: overrides.filters !== undefined ? overrides.filters : filters,
     };
     window.history.pushState(state, '', buildRoutePath(state));
-  }, [activeView, selectedModel, selectedFault, forceExplorer, search, filters, buildRoutePath]);
+  }, [activeView, selectedModel, selectedFault, selectedArticleId, forceExplorer, search, filters, buildRoutePath]);
 
   // Replace initial history entry so back from first page works
   useEffect(() => {
@@ -853,6 +863,7 @@ function AppContent() {
           activeView: 'home',
           selectedModel: null,
           selectedFaultId: null,
+          selectedArticleId: null,
           forceExplorer: false,
           search: '',
           filters: EMPTY_FILTERS,
@@ -861,6 +872,7 @@ function AppContent() {
         skipPushRef.current = true;
         setActiveView(s.activeView || 'home');
         setSelectedModel(s.selectedModel || (s.selectedModelSlug ? findModelBySlug(s.selectedModelSlug, data, models) : null));
+        setSelectedArticleId(s.selectedArticleId || null);
         // Restore selectedFault from ID
         if (s.selectedFaultId) {
           const found = data.find(f => String(f.id) === String(s.selectedFaultId));
@@ -904,6 +916,7 @@ function AppContent() {
       uzman: 'Uzman Görüşleri | KronikAraba',
       masraf: 'Masraf Hesaplama | KronikAraba',
       articles: 'Makaleler | KronikAraba',
+      articleDetail: 'Makale | KronikAraba',
     };
     document.title = titles[activeView] || titles.home;
   }, [activeView]);
@@ -930,6 +943,7 @@ function AppContent() {
   const handleNavAction = useCallback((action) => {
     setSelectedModel(null);
     setSelectedFault(null);
+    setSelectedArticleId(null);
     setSidebarOpen(false);
     const emptyFilters = EMPTY_FILTERS;
     if (action === 'reset') {
@@ -938,19 +952,19 @@ function AppContent() {
       setFilters(emptyFilters);
       setSort('reports-desc');
       setForceExplorer(false);
-      pushNav({ activeView: 'home', selectedModel: null, selectedFaultId: null, forceExplorer: false, search: '', filters: emptyFilters });
+      pushNav({ activeView: 'home', selectedModel: null, selectedFaultId: null, selectedArticleId: null, forceExplorer: false, search: '', filters: emptyFilters });
     } else if (action === 'brands') {
       setActiveView('markalar');
-      pushNav({ activeView: 'markalar', selectedModel: null, selectedFaultId: null });
+      pushNav({ activeView: 'markalar', selectedModel: null, selectedFaultId: null, selectedArticleId: null });
     } else if (action === 'uzman') {
       setActiveView('uzman');
-      pushNav({ activeView: 'uzman', selectedModel: null, selectedFaultId: null });
+      pushNav({ activeView: 'uzman', selectedModel: null, selectedFaultId: null, selectedArticleId: null });
     } else if (action === 'masraf') {
       setActiveView('masraf');
-      pushNav({ activeView: 'masraf', selectedModel: null, selectedFaultId: null });
+      pushNav({ activeView: 'masraf', selectedModel: null, selectedFaultId: null, selectedArticleId: null });
     } else if (action === 'articles') {
       setActiveView('articles');
-      pushNav({ activeView: 'articles', selectedModel: null, selectedFaultId: null });
+      pushNav({ activeView: 'articles', selectedModel: null, selectedFaultId: null, selectedArticleId: null });
     }
   }, [pushNav]);
 
@@ -1119,6 +1133,9 @@ function AppContent() {
       : [article, ...articles];
     setArticles(next);
     const savedRemotely = await saveArticles(next);
+    if (selectedArticleId && String(selectedArticleId) === String(article.id)) {
+      setSelectedArticleId(article.id);
+    }
     setEditArticle(null);
     setToast(savedRemotely
       ? 'Makale kaydedildi!'
@@ -1126,14 +1143,38 @@ function AppContent() {
     );
   };
 
+  const handleOpenArticle = (article) => {
+    setSelectedArticleId(article.id);
+    setSelectedModel(null);
+    setSelectedFault(null);
+    setActiveView('articleDetail');
+    pushNav({ activeView: 'articleDetail', selectedArticleId: article.id, selectedModel: null, selectedFaultId: null });
+  };
+
+  const handleDeleteArticle = async (id) => {
+    if (!confirm('Bu makaleyi silmek istediğinize emin misiniz?')) return;
+    const next = articles.filter(a => String(a.id) !== String(id));
+    setArticles(next);
+    await saveArticles(next);
+    if (String(selectedArticleId) === String(id)) {
+      setSelectedArticleId(null);
+      setActiveView('articles');
+      pushNav({ activeView: 'articles', selectedArticleId: null, selectedModel: null, selectedFaultId: null });
+    }
+    setToast('Makale silindi.');
+  };
+
   const notify = (msg) => setToast(msg);
   const home = content.home;
+  const selectedArticle = selectedArticleId
+    ? articles.find(a => String(a.id) === String(selectedArticleId))
+    : null;
 
   return (
     <>
       <Navbar
         content={content}
-        search={search} onSearch={(v) => { setSearch(v); setSelectedModel(null); setSelectedFault(null); setActiveView('home'); if (v) pushNav({ activeView: 'home', selectedModel: null, selectedFaultId: null, search: v }); }}
+        search={search} onSearch={(v) => { setSearch(v); setSelectedModel(null); setSelectedFault(null); setSelectedArticleId(null); setActiveView('home'); if (v) pushNav({ activeView: 'home', selectedModel: null, selectedFaultId: null, selectedArticleId: null, search: v }); }}
         onAdd={() => authed && setEditFault('new')}
         user={user} onLogin={() => openAuth('login')} onRegister={() => openAuth('register')} onLogout={handleLogout}
         onMenuToggle={() => setSidebarOpen(o => !o)}
@@ -1234,6 +1275,22 @@ function AppContent() {
             <MasrafPage data={data} content={content} onModelClick={(m) => { setSelectedModel(m); pushNav({ selectedModel: m }); }} />
           </main>
         </div>
+      ) : activeView === 'articleDetail' ? (
+        <div className="layout layout-detail">
+          <main className="main main-detail" style={{ maxWidth: 940 }}>
+            <ArticleDetailPage
+              article={selectedArticle}
+              adminMode={articleAdminMode}
+              onBack={() => {
+                setSelectedArticleId(null);
+                setActiveView('articles');
+                pushNav({ activeView: 'articles', selectedArticleId: null, selectedModel: null, selectedFaultId: null });
+              }}
+              onEditArticle={setEditArticle}
+              onDeleteArticle={handleDeleteArticle}
+            />
+          </main>
+        </div>
       ) : activeView === 'articles' ? (
         <div className="layout layout-detail">
           <main className="main main-detail" style={{ maxWidth: 1040 }}>
@@ -1242,6 +1299,8 @@ function AppContent() {
               adminMode={articleAdminMode}
               onNewArticle={() => setEditArticle('new')}
               onEditArticle={setEditArticle}
+              onDeleteArticle={handleDeleteArticle}
+              onOpenArticle={handleOpenArticle}
             />
           </main>
         </div>
@@ -1263,10 +1322,11 @@ function AppContent() {
               setSearch(val);
               setSelectedModel(null);
               setSelectedFault(null);
+              setSelectedArticleId(null);
               setActiveView('home');
               if (val) {
                 setForceExplorer(true);
-                pushNav({ activeView: 'home', selectedModel: null, selectedFaultId: null, forceExplorer: true, search: val });
+                pushNav({ activeView: 'home', selectedModel: null, selectedFaultId: null, selectedArticleId: null, forceExplorer: true, search: val });
               }
             }}
             onExploreAll={() => { setForceExplorer(true); pushNav({ forceExplorer: true }); }}

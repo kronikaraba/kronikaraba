@@ -88,7 +88,7 @@ export default function ArticleEditModal({ article, onSave, onClose }) {
             </div>
             <div className="form-group">
               <label>İçerik *</label>
-              <textarea value={form.body} onChange={e => set('body', e.target.value)} rows={5} placeholder="Devamını Oku alanında açılacak makale metni" required />
+              <textarea value={form.body} onChange={e => set('body', e.target.value)} rows={10} placeholder="Detay sayfasında yayınlanacak uzun makale metni" required />
             </div>
             <div className="form-row">
               <div className="form-group">
