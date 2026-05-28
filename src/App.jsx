@@ -48,9 +48,7 @@ function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, o
         </svg>
       </button>
       <a className="navbar-logo" href="#" onClick={handleLogoClick}>
-        <span className="logo-badge">
-          <Editable value={nb.brandName} path={['navbar', 'brandName']} />
-        </span>
+        <img className="navbar-logo-img" src="/brand/kronikaraba-logo.png" alt={nb.brandName || 'KronikArıza'} />
       </a>
 
       <div className="navbar-nav">

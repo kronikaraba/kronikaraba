@@ -108,6 +108,12 @@ const popularModelFaultSeeds2026 = [
   ["Citroen", "Berlingo 1.5 BlueHDi", 2018, 2026, "Dizel", "Triger zinciri ve AdBlue uyarısı", "Motor sesi, AdBlue arızası, performans düşüşü", "1.5 BlueHDi zincir sesi ve SCR sistemi kontrol edilmeli.", "YÜKSEK", 18000, 56000, 90000, "Motor"],
   ["Ford", "Tourneo Courier 1.5 TDCi", 2014, 2023, "Dizel", "Enjektör ve DPF şehir içi sorunu", "Siyah duman, çekiş düşmesi, sık fan açma", "Enjektör düzeltme değerleri ve DPF doluluk oranı okunmalı.", "ORTA", 10000, 32000, 120000, "Egzoz"],
   ["Fiat", "Fiorino 1.3 Multijet", 2008, 2026, "Dizel", "EGR valfi kurumlanması", "Çekiş düşüklüğü, siyah duman, motor arıza lambası", "EGR canlı değerleri ve emme hattı kurum seviyesi kontrol edilmeli.", "ORTA", 5000, 16000, 120000, "Egzoz"],
+  ["Ford", "Transit 2.0 EcoBlue", 2018, 2026, "Dizel", "Islak kayış ve yağ pompası kayışı aşınması", "Yağ basınç uyarısı, motor sesi, geç çalışma, performans düşüşü", "Bakım geçmişinde doğru yağ kullanımı ve kayış kontrolü mutlaka doğrulanmalı.", "YÜKSEK", 26000, 70000, 100000, "Motor"],
+  ["Ford", "Transit Custom 2.0 EcoBlue", 2018, 2026, "Dizel", "AdBlue NOx sensörü ve DPF doluluk sorunu", "AdBlue uyarısı, sık rejenerasyon, çekiş düşmesi, motor arıza lambası", "SCR hata kodları, NOx sensörü değerleri ve DPF doluluk oranı okunmalı.", "YÜKSEK", 18000, 56000, 90000, "Egzoz"],
+  ["Opel", "Combo 1.5 BlueHDi", 2019, 2026, "Dizel", "AdBlue pompası ve kristalleşme arızası", "UREA uyarısı, çalıştırma sayacı, egzoz sistemi arızası", "AdBlue tank-pompa ünitesi, kristalleşme ve NOx sensör değerleri kontrol edilmeli.", "YÜKSEK", 18000, 52000, 80000, "Egzoz"],
+  ["Peugeot", "Rifter 1.5 BlueHDi", 2018, 2026, "Dizel", "AdBlue deposu ve NOx sensörü arızası", "UREA uyarısı, motor arıza lambası, çekiş düşmesi, çalıştırma sayacı", "AdBlue depo basıncı, pompa çalışması ve NOx sensörleri cihazla kontrol edilmeli.", "YÜKSEK", 18000, 52000, 80000, "Egzoz"],
+  ["Fiat", "Ducato 2.2 MultiJet", 2021, 2026, "Dizel", "AdBlue pompası ve DPF doluluk uyarısı", "AdBlue uyarısı, sık rejenerasyon, çekiş düşmesi, limp mode", "DPF diferansiyel basıncı, SCR basıncı ve AdBlue pompa değerleri okunmalı.", "YÜKSEK", 18000, 58000, 90000, "Egzoz"],
+  ["Fiat", "Scudo 1.5 BlueHDi", 2022, 2026, "Dizel", "AdBlue kristalleşmesi ve EGR kurumlanması", "UREA uyarısı, düşük devirde boğulma, siyah duman, performans düşüşü", "AdBlue deposu, EGR komut değerleri ve emme hattı kurum seviyesi kontrol edilmeli.", "ORTA", 12000, 42000, 70000, "Egzoz"],
 ];
 
 const formatKm = (km) => `${Number(km).toLocaleString('tr-TR')} km+`;

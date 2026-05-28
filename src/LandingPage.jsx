@@ -80,10 +80,9 @@ export default function LandingPage({
       <div className="lp-banner">
         <div className="lp-banner-inner">
           <div className="lp-banner-left">
-            <div className="lp-banner-logo">🚗</div>
-            <div>
+            <div className="lp-banner-brand">
               <h1 className="lp-banner-title">
-                <Editable value={lp.heroTitle || 'Kronika Arıza Forumu'} path={['landing','heroTitle']} />
+                <Editable value={lp.heroTitle || 'Kronik Arıza Forumu'} path={['landing','heroTitle']} />
               </h1>
               <p className="lp-banner-sub">
                 <Editable value={lp.heroSubtitle || 'Türkiye\'nin en büyük araç kronik arıza veritabanı — sürücüler tarafından, sürücüler için.'} path={['landing','heroSubtitle']} multiline />

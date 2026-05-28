@@ -89,7 +89,16 @@ h6 {
   gap: 0;
   text-decoration: none;
   flex-shrink: 0;
-  margin-right: 28px;
+  margin-right: 24px;
+}
+
+.navbar-logo-img {
+  display: block;
+  width: auto;
+  height: 42px;
+  max-width: 150px;
+  object-fit: contain;
+  object-position: left center;
 }
 
 .logo-badge {
@@ -2569,6 +2578,11 @@ h6 {
 
   .navbar-logo {
     margin-right: auto;
+  }
+
+  .navbar-logo-img {
+    height: 34px;
+    max-width: 112px;
   }
 
   .logo-badge {
@@ -6791,6 +6805,13 @@ body:has(.forum-lightbox) {
   gap: 16px;
 }
 
+.lp-banner-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: min(420px, 100%);
+}
+
 .lp-banner-logo {
   font-size: 40px;
   line-height: 1;
@@ -7540,6 +7561,11 @@ body:has(.forum-lightbox) {
 
   .lp-banner-logo {
     font-size: 30px;
+  }
+
+  .lp-banner-brand {
+    min-width: 0;
+    width: 100%;
   }
 
   .lp-banner-title {
