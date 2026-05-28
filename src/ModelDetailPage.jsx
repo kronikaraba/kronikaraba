@@ -328,7 +328,7 @@ export default function ModelDetailPage({
                   </div>
                 </div>
                 <div className="dfc-discussion">
-                  <CommentSection faultId={fault.id} user={user} onAuthRequest={onAuthRequest} adminMode={adminMode} onForumChange={onForumChange} />
+                  <CommentSection faultId={fault.id} fault={fault} user={user} onAuthRequest={onAuthRequest} adminMode={adminMode} onForumChange={onForumChange} />
                 </div>
               </div>
             ))}

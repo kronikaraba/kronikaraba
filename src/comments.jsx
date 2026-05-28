@@ -76,34 +76,40 @@ const POST_TYPES = [
 const MIN_VISIBLE_POSTS = 5;
 const DEMO_META_KEY = '__demoSeededFaults';
 const DEMO_VERSION_KEY = '__demoCommentVersion';
-const DEMO_COMMENT_VERSION = 'vehicle-research-v2';
+const DEMO_COMMENT_VERSION = 'vehicle-research-v3-natural';
+const LEGACY_DEMO_PATTERNS = [
+  'icin arastirma notu',
+  'icin teknik not',
+  'kullanicisindan beklenen bilgi',
+  'Arastirma notu olarak',
+];
 
 const DEMO_POST_TEMPLATES = [
   {
     type: 'yorum',
     username: 'Demo Kullanici 01',
-    text: ({ vehicle, fault }) => `${vehicle} icin arastirma notu: ${fault} basliginda ilk bakilacak yer bakim gecmisi ve arizanin hangi kmde basladigi. Bu bilgi olmadan yorum biraz havada kaliyor.`,
+    text: ({ vehicle, fault }) => `${fault} basliginda ilk bakilacak yer ${vehicle} aracinin bakim gecmisi ve arizanin hangi kmde basladigi. Bu bilgi olmadan yorum biraz havada kaliyor.`,
   },
   {
     type: 'soru',
     username: 'Demo Kullanici 02',
-    text: ({ vehicle, symptoms }) => `${vehicle} kullanicisindan beklenen bilgi: ${symptoms} belirtileri surekli mi, yoksa soguk ilk calistirmada mi cikiyor? Bence bunu yazmak teshisi cok degistirir.`,
+    text: ({ vehicle, symptoms }) => `Belirtiler ${symptoms} diye geciyor; ${vehicle} kullananda surekli mi, yoksa soguk ilk calistirmada mi cikiyor? Bence bunu yazmak teshisi cok degistirir.`,
   },
   {
     type: 'oneri',
     username: 'Demo Kullanici 03',
-    text: ({ vehicle, checkTip }) => `${vehicle} ekspertizinde sadece test surusu yetmiyor. Arastirma notu olarak sunu ekledim: ${checkTip}`,
+    text: ({ vehicle, checkTip }) => `Ekspertizde sadece test surusu yetmiyor, ${vehicle} bakarken ${checkTip}`,
   },
   {
     type: 'yorum',
     username: 'Demo Kullanici 04',
-    text: ({ vehicle, costText }) => `${vehicle} icin masraf araligi ${costText} gorunuyor. Ayni is icin servisler arasi fiyat cok oynayabilir, net fiyat almadan karar vermemek lazim.`,
+    text: ({ vehicle, costText }) => `Masraf araligi ${costText} civarina cikabiliyor. ${vehicle} icin ayni is servisler arasinda cok oynar, net fiyat almadan karar vermemek lazim.`,
   },
   {
     type: 'usta',
     username: 'Demo Usta Notu',
     isUsta: true,
-    text: ({ vehicle, category, risk }) => `${vehicle} icin teknik not: ${category} tarafinda once basit kontroller, sonra canli veri/hata kodu bakilmali. Risk seviyesi ${risk}; direk parca degisimi masrafi buyutur.`,
+    text: ({ vehicle, category, risk }) => `${category} tarafinda once basit kontroller, sonra canli veri/hata kodu bakilmali. ${vehicle} kayitlarinda risk seviyesi ${risk}; direk parca degisimi masrafi buyutur.`,
   },
 ];
 
@@ -131,6 +137,15 @@ function storedPostsForFault(forum, faultId) {
   const posts = forum?.[faultId];
   if (Array.isArray(posts)) return posts;
   return SEED[faultId] || [];
+}
+
+function hasStaleDemoPosts(posts) {
+  return (posts || []).some(post => (
+    post?.isDemo && (
+      post.demoVersion !== DEMO_COMMENT_VERSION ||
+      LEGACY_DEMO_PATTERNS.some(pattern => String(post.text || '').includes(pattern))
+    )
+  ));
 }
 
 function faultContext(faultOrId) {
@@ -192,7 +207,7 @@ function buildDemoPost(faultOrId, index) {
   };
 }
 
-function withDemoPosts(faultOrId, posts, refreshExisting = false) {
+function withDemoPosts(faultOrId, posts, refreshExisting = false, backfillMissing = true) {
   const ctx = faultContext(faultOrId);
   const basePosts = Array.isArray(posts) ? posts : [];
   const normalizedPosts = refreshExisting
@@ -207,7 +222,7 @@ function withDemoPosts(faultOrId, posts, refreshExisting = false) {
         };
       })
     : basePosts;
-  const needed = Math.max(0, MIN_VISIBLE_POSTS - normalizedPosts.length);
+  const needed = backfillMissing ? Math.max(0, MIN_VISIBLE_POSTS - normalizedPosts.length) : 0;
   if (!needed) return normalizedPosts;
   return [
     ...normalizedPosts,
@@ -218,12 +233,14 @@ function withDemoPosts(faultOrId, posts, refreshExisting = false) {
 function ensureDemoPostsForFault(forum, faultOrId, forceRefresh = false) {
   const ctx = faultContext(faultOrId);
   const key = String(ctx.id);
-  const needsRefresh = forceRefresh || forum?.[DEMO_VERSION_KEY] !== DEMO_COMMENT_VERSION;
-  if (isDemoSeeded(forum, key) && !needsRefresh) return forum;
+  const storedPosts = storedPostsForFault(forum, key);
+  const seeded = isDemoSeeded(forum, key);
+  const needsRefresh = forceRefresh || forum?.[DEMO_VERSION_KEY] !== DEMO_COMMENT_VERSION || hasStaleDemoPosts(storedPosts);
+  if (seeded && !needsRefresh) return forum;
 
   return {
     ...forum,
-    [key]: withDemoPosts(ctx, storedPostsForFault(forum, key), needsRefresh),
+    [key]: withDemoPosts(ctx, storedPosts, needsRefresh, !seeded),
     [DEMO_META_KEY]: [...new Set([...seededForumIds(forum), key])],
     [DEMO_VERSION_KEY]: DEMO_COMMENT_VERSION,
   };
@@ -442,7 +459,7 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
 }
 
 // ── Main CommentSection ───────────────────────────────────────────────────────
-export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminModeProp, alwaysOpen: alwaysOpenProp, onForumChange }) {
+export function CommentSection({ faultId, fault, user, onAuthRequest, adminMode: adminModeProp, alwaysOpen: alwaysOpenProp, onForumChange }) {
   // Admin yetkisi: hem live-edit modunda hem de user.isAdmin olan hesapta çalışır
   const adminMode = adminModeProp || user?.isAdmin === true;
 
@@ -463,7 +480,7 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
     async function loadData() {
       try {
         const stored = await loadForum();
-        setForum(ensureDemoPostsForFault({ ...stored }, faultId));
+        setForum(ensureDemoPostsForFault({ ...stored }, fault || faultId));
       } catch (err) {
         console.error("Failed to load forum comments", err);
       } finally {

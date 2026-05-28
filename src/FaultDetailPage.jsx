@@ -182,6 +182,7 @@ export default function FaultDetailPage({ fault, activity, user, onAuthRequest, 
         </div>
         <CommentSection
           faultId={fault.id}
+          fault={fault}
           user={user}
           onAuthRequest={onAuthRequest}
           adminMode={commentAdminMode}
