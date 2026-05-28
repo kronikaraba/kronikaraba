@@ -1031,6 +1031,16 @@ function AppContent() {
   };
   const openAuth = (tab = 'login') => setAuthModal(tab);
 
+  // Build activity map BEFORE filtered — must be declared first to avoid TDZ
+  const faultActivityMap = useMemo(() => {
+    return buildFaultActivityMap(data, forum);
+  }, [data, forum]);
+
+  // Build comment count map once (instead of per-card localStorage reads)
+  const commentCountMap = useMemo(() => {
+    return buildCommentCountMap(data.map(f => f.id), forum);
+  }, [data, forum]);
+
   const filtered = useMemo(() => {
     let d = data;
     if (search.trim()) {
@@ -1066,15 +1076,6 @@ function AppContent() {
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [search, filters, sort]);
-
-  // Build comment count map once (instead of per-card localStorage reads)
-  const commentCountMap = useMemo(() => {
-    return buildCommentCountMap(data.map(f => f.id), forum);
-  }, [data, forum]);
-
-  const faultActivityMap = useMemo(() => {
-    return buildFaultActivityMap(data, forum);
-  }, [data, forum]);
 
   const handleForumChange = useCallback((nextForum) => {
     setForum(nextForum || {});
