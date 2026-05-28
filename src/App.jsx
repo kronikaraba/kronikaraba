@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { riskLevels } from './data.js';
 import { loadCategories, loadMotorTypes } from './siteContent.js';
 import { AuthModal, loadUser, logout } from './auth.jsx';
-import { CommentSection, getCommentCount, buildCommentCountMap, buildFaultActivityMap, ensureDemoPostsForFaults } from './comments.jsx';
+import { CommentSection, getCommentCount, buildCommentCountMap, buildFaultActivityMap, ensureSeededPostsForFaults } from './comments.jsx';
 import ModelDetailPage from './ModelDetailPage.jsx';
 import FaultDetailPage from './FaultDetailPage.jsx';
 import { loadAdminFaults, saveAdminFaults, loadAdminModels, saveAdminModels, loadPending, savePending, loadForum, saveForum, loadArticles, saveArticles } from './adminStorage.js';
@@ -761,10 +761,10 @@ function AppContent() {
         setModels(loadedModels);
         setCategories(loadedCats);
         setMotorTypes(loadedMotors);
-        const forumWithDemoPosts = ensureDemoPostsForFaults(loadedData, loadedForum);
-        setForum(forumWithDemoPosts);
-        if (forumWithDemoPosts !== loadedForum) {
-          saveForum(forumWithDemoPosts);
+        const forumWithSeededPosts = ensureSeededPostsForFaults(loadedData, loadedForum);
+        setForum(forumWithSeededPosts);
+        if (forumWithSeededPosts !== loadedForum) {
+          saveForum(forumWithSeededPosts);
         }
         setArticles(loadedArticles);
 

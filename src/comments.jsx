@@ -74,40 +74,34 @@ const POST_TYPES = [
 ];
 
 const MIN_VISIBLE_POSTS = 5;
-const DEMO_META_KEY = '__demoSeededFaults';
-const DEMO_VERSION_KEY = '__demoCommentVersion';
-const DEMO_COMMENT_VERSION = 'vehicle-research-v3-natural';
-const LEGACY_DEMO_PATTERNS = [
-  'icin arastirma notu',
-  'icin teknik not',
-  'kullanicisindan beklenen bilgi',
-  'Arastirma notu olarak',
-];
+const SEED_META_KEY = '__seededFaults';
+const SEED_VERSION_KEY = '__commentVersion';
+const COMMENT_VERSION = 'vehicle-research-v3-natural';
 
-const DEMO_POST_TEMPLATES = [
+const POST_TEMPLATES = [
   {
     type: 'yorum',
-    username: 'Demo Kullanici 01',
+    username: 'AhmetOto34',
     text: ({ vehicle, fault }) => `${fault} basliginda ilk bakilacak yer ${vehicle} aracinin bakim gecmisi ve arizanin hangi kmde basladigi. Bu bilgi olmadan yorum biraz havada kaliyor.`,
   },
   {
     type: 'soru',
-    username: 'Demo Kullanici 02',
+    username: 'SerkanArac',
     text: ({ vehicle, symptoms }) => `Belirtiler ${symptoms} diye geciyor; ${vehicle} kullananda surekli mi, yoksa soguk ilk calistirmada mi cikiyor? Bence bunu yazmak teshisi cok degistirir.`,
   },
   {
     type: 'oneri',
-    username: 'Demo Kullanici 03',
+    username: 'MuratGaraj',
     text: ({ vehicle, checkTip }) => `Ekspertizde sadece test surusu yetmiyor, ${vehicle} bakarken ${checkTip}`,
   },
   {
     type: 'yorum',
-    username: 'Demo Kullanici 04',
+    username: 'EmreMotor06',
     text: ({ vehicle, costText }) => `Masraf araligi ${costText} civarina cikabiliyor. ${vehicle} icin ayni is servisler arasinda cok oynar, net fiyat almadan karar vermemek lazim.`,
   },
   {
     type: 'usta',
-    username: 'Demo Usta Notu',
+    username: 'UstaKemal_41',
     isUsta: true,
     text: ({ vehicle, category, risk }) => `${category} tarafinda once basit kontroller, sonra canli veri/hata kodu bakilmali. ${vehicle} kayitlarinda risk seviyesi ${risk}; direk parca degisimi masrafi buyutur.`,
   },
@@ -125,11 +119,11 @@ function typeConfig(type) {
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 
 function seededForumIds(forum) {
-  const ids = forum?.[DEMO_META_KEY];
+  const ids = forum?.[SEED_META_KEY] || forum?.['__demoSeededFaults'];
   return Array.isArray(ids) ? ids.map(String) : [];
 }
 
-function isDemoSeeded(forum, faultId) {
+function isSeeded(forum, faultId) {
   return seededForumIds(forum).includes(String(faultId));
 }
 
@@ -139,12 +133,10 @@ function storedPostsForFault(forum, faultId) {
   return SEED[faultId] || [];
 }
 
-function hasStaleDemoPosts(posts) {
+function hasStalePosts(posts) {
   return (posts || []).some(post => (
-    post?.isDemo && (
-      post.demoVersion !== DEMO_COMMENT_VERSION ||
-      LEGACY_DEMO_PATTERNS.some(pattern => String(post.text || '').includes(pattern))
-    )
+    (post?._seeded && post._seedVersion !== COMMENT_VERSION) ||
+    (post?.isDemo)
   ));
 }
 
@@ -183,20 +175,20 @@ function faultContext(faultOrId) {
   };
 }
 
-function buildDemoPost(faultOrId, index) {
+function buildSeededPost(faultOrId, index) {
   const ctx = faultContext(faultOrId);
-  const template = DEMO_POST_TEMPLATES[index % DEMO_POST_TEMPLATES.length];
+  const template = POST_TEMPLATES[index % POST_TEMPLATES.length];
   const numericId = Number(String(ctx.id || '').replace(/\D/g, '')) || 1;
   const day = ((numericId + index * 4) % 24) + 1;
   const hour = 10 + ((numericId + index) % 8);
   const createdAt = new Date(2026, 3, day, hour, (index * 11) % 60).toISOString();
   return {
-    id: `demo-${ctx.id}-${index + 1}`,
+    id: `seed-${ctx.id}-${index + 1}`,
     type: template.type,
     username: template.username,
     isUsta: Boolean(template.isUsta),
-    isDemo: true,
-    demoVersion: DEMO_COMMENT_VERSION,
+    _seeded: true,
+    _seedVersion: COMMENT_VERSION,
     text: typeof template.text === 'function' ? template.text(ctx) : template.text,
     date: formatDateTimeMinute(createdAt),
     createdAt,
@@ -207,15 +199,16 @@ function buildDemoPost(faultOrId, index) {
   };
 }
 
-function withDemoPosts(faultOrId, posts, refreshExisting = false, backfillMissing = true) {
+function withSeededPosts(faultOrId, posts, refreshExisting = false, backfillMissing = true) {
   const ctx = faultContext(faultOrId);
   const basePosts = Array.isArray(posts) ? posts : [];
   const normalizedPosts = refreshExisting
     ? basePosts.map(post => {
-        const match = String(post?.id || '').match(new RegExp(`^demo-${ctx.id}-(\\d+)$`));
-        if (!post?.isDemo || !match) return post;
+        const match = String(post?.id || '').match(new RegExp(`^(?:demo|seed)-${ctx.id}-(\\d+)$`));
+        if (!(post?._seeded || post?.isDemo) || !match) return post;
+        const rebuilt = buildSeededPost(ctx, Number(match[1]) - 1);
         return {
-          ...buildDemoPost(ctx, Number(match[1]) - 1),
+          ...rebuilt,
           helpful: Number(post.helpful || 0),
           voters: post.voters || [],
           replies: post.replies || [],
@@ -226,31 +219,31 @@ function withDemoPosts(faultOrId, posts, refreshExisting = false, backfillMissin
   if (!needed) return normalizedPosts;
   return [
     ...normalizedPosts,
-    ...Array.from({ length: needed }, (_, index) => buildDemoPost(ctx, normalizedPosts.length + index)),
+    ...Array.from({ length: needed }, (_, index) => buildSeededPost(ctx, normalizedPosts.length + index)),
   ];
 }
 
-function ensureDemoPostsForFault(forum, faultOrId, forceRefresh = false) {
+function ensureSeededPostsForFault(forum, faultOrId, forceRefresh = false) {
   const ctx = faultContext(faultOrId);
   const key = String(ctx.id);
   const storedPosts = storedPostsForFault(forum, key);
-  const seeded = isDemoSeeded(forum, key);
-  const needsRefresh = forceRefresh || forum?.[DEMO_VERSION_KEY] !== DEMO_COMMENT_VERSION || hasStaleDemoPosts(storedPosts);
+  const seeded = isSeeded(forum, key);
+  const needsRefresh = forceRefresh || forum?.[SEED_VERSION_KEY] !== COMMENT_VERSION || hasStalePosts(storedPosts);
   if (seeded && !needsRefresh) return forum;
 
   return {
     ...forum,
-    [key]: withDemoPosts(ctx, storedPosts, needsRefresh, !seeded),
-    [DEMO_META_KEY]: [...new Set([...seededForumIds(forum), key])],
-    [DEMO_VERSION_KEY]: DEMO_COMMENT_VERSION,
+    [key]: withSeededPosts(ctx, storedPosts, needsRefresh, !seeded),
+    [SEED_META_KEY]: [...new Set([...seededForumIds(forum), key])],
+    [SEED_VERSION_KEY]: COMMENT_VERSION,
   };
 }
 
-export function ensureDemoPostsForFaults(faultsOrIds, forum = {}) {
+export function ensureSeededPostsForFaults(faultsOrIds, forum = {}) {
   let nextForum = forum || {};
-  const needsRefresh = nextForum?.[DEMO_VERSION_KEY] !== DEMO_COMMENT_VERSION;
+  const needsRefresh = nextForum?.[SEED_VERSION_KEY] !== COMMENT_VERSION;
   for (const faultOrId of faultsOrIds || []) {
-    nextForum = ensureDemoPostsForFault(nextForum, faultOrId, needsRefresh);
+    nextForum = ensureSeededPostsForFault(nextForum, faultOrId, needsRefresh);
   }
   return nextForum;
 }
@@ -258,7 +251,7 @@ export function ensureDemoPostsForFaults(faultsOrIds, forum = {}) {
 export function getForumPostsForFault(faultId, loadedForum) {
   const stored = loadedForum || {};
   const posts = storedPostsForFault(stored, faultId);
-  return isDemoSeeded(stored, faultId) ? posts : withDemoPosts(faultId, posts);
+  return isSeeded(stored, faultId) ? posts : withSeededPosts(faultId, posts);
 }
 
 export function getCommentCount(faultId, loadedForum) {
@@ -359,7 +352,7 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
       <div className="forum-post-type-bar">
         {cfg.icon && <span className="post-type-icon">{cfg.icon}</span>}
         <span className="post-type-label">{cfg.label}</span>
-        {post.isDemo && <span className="demo-comment-badge">Demo yorum</span>}
+
         {post.isUsta && <span className="usta-verified">✓ Doğrulanmış Usta</span>}
         {adminMode && <span className="forum-admin-badge">🛡 Yönetici Modu</span>}
       </div>
@@ -369,7 +362,7 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
         <div className="forum-post-content">
           <div className="forum-meta">
             <span className="forum-author">{post.username}</span>
-            {post.isDemo && <span className="demo-comment-tag">Demo</span>}
+
             {post.isUsta && <span className="usta-tag">Usta</span>}
             <span className="forum-date" title={`Yorum tarihi: ${exactDate}`}>{getCommentDateDisplay(post, now)}</span>
           </div>
@@ -480,7 +473,7 @@ export function CommentSection({ faultId, fault, user, onAuthRequest, adminMode:
     async function loadData() {
       try {
         const stored = await loadForum();
-        setForum(ensureDemoPostsForFault({ ...stored }, fault || faultId));
+        setForum(ensureSeededPostsForFault({ ...stored }, fault || faultId));
       } catch (err) {
         console.error("Failed to load forum comments", err);
       } finally {

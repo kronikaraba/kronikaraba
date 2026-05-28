@@ -283,7 +283,7 @@ export default function AdminHub({
                           {!p.isReply && p.type && (
                             <span className="admin-hub-type-tag">{POST_TYPE_LABELS[p.type] || p.type}</span>
                           )}
-                          {p.isDemo && <span className="admin-hub-type-tag">Demo yorum</span>}
+
                         </span>
                         <span className="admin-hub-meta">{p.username} · {getCommentDateLabel(p)}</span>
                       </div>
