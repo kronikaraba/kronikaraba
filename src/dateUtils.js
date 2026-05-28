@@ -1,3 +1,23 @@
+import { useState, useEffect } from 'react';
+
+/**
+ * Returns a Date that updates every ~60 seconds.
+ * Use this in any component that shows relative timestamps so they stay fresh.
+ */
+export function useNow() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    // Align first tick to the next whole minute so all instances stay in sync
+    const msToNextMinute = 60000 - (Date.now() % 60000);
+    let timer = setTimeout(() => {
+      setNow(new Date());
+      timer = setInterval(() => setNow(new Date()), 60000);
+    }, msToNextMinute);
+    return () => clearTimeout(timer);
+  }, []);
+  return now;
+}
+
 const MINUTE_FORMATTER = new Intl.DateTimeFormat('tr-TR', {
   day: '2-digit',
   month: '2-digit',
@@ -51,7 +71,7 @@ export function formatDateTimeMinute(value, fallbackId) {
   return MINUTE_FORMATTER.format(date);
 }
 
-export function formatRelativeTime(value, fallbackId, now = new Date()) {
+export function formatRelativeTime(value, fallbackId, now = new Date()) {  // now is injectable for live updates
   const ts = getDateTimeMs(value, fallbackId);
   if (!ts) return 'az önce';
 
@@ -82,19 +102,19 @@ export function getCommentDateLabel(item) {
   return formatDateTimeMinute(item?.updatedAt || item?.createdAt || item?.date, item?.id);
 }
 
-export function getCommentDateDisplay(item) {
+export function getCommentDateDisplay(item, now = new Date()) {
   const createdSource = item?.createdAt || item?.date;
   const updatedSource = item?.updatedAt;
   const createdTs = getDateTimeMs(createdSource, item?.id);
   const updatedTs = updatedSource ? getDateTimeMs(updatedSource, item?.id) : 0;
   const isUpdated = updatedTs && createdTs && updatedTs - createdTs > 60000;
   const source = isUpdated ? updatedSource : createdSource;
-  const relative = formatRelativeTime(source, item?.id);
+  const relative = formatRelativeTime(source, item?.id, now);
   const exact = formatDateTimeMinute(source, item?.id);
   return `${relative}${isUpdated ? ' güncellendi' : ''} · ${exact}`;
 }
 
-export function getFaultActivityInfo(fault, posts = []) {
+export function getFaultActivityInfo(fault, posts = [], now = new Date()) {
   const activities = [];
 
   const addActivity = (source, fallbackId, label) => {
@@ -141,7 +161,7 @@ export function getFaultActivityInfo(fault, posts = []) {
 
   const latest = activities.sort((a, b) => b.timestamp - a.timestamp)[0];
   const exact = formatDateTimeMinute(latest?.timestamp || faultCreatedSource, latest?.fallbackId || fault?.id);
-  const relative = formatRelativeTime(latest?.timestamp || faultCreatedSource, latest?.fallbackId || fault?.id);
+  const relative = formatRelativeTime(latest?.timestamp || faultCreatedSource, latest?.fallbackId || fault?.id, now);
   const label = latest?.label || 'güncellendi';
 
   return {

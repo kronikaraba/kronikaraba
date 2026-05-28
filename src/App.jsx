@@ -2,10 +2,10 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { riskLevels } from './data.js';
 import { loadCategories, loadMotorTypes } from './siteContent.js';
 import { AuthModal, loadUser, logout } from './auth.jsx';
-import { CommentSection, getCommentCount, buildCommentCountMap, buildFaultActivityMap } from './comments.jsx';
+import { CommentSection, getCommentCount, buildCommentCountMap, buildFaultActivityMap, ensureDemoPostsForFaults } from './comments.jsx';
 import ModelDetailPage from './ModelDetailPage.jsx';
 import FaultDetailPage from './FaultDetailPage.jsx';
-import { loadAdminFaults, saveAdminFaults, loadAdminModels, saveAdminModels, loadPending, savePending, loadForum, loadArticles, saveArticles } from './adminStorage.js';
+import { loadAdminFaults, saveAdminFaults, loadAdminModels, saveAdminModels, loadPending, savePending, loadForum, saveForum, loadArticles, saveArticles } from './adminStorage.js';
 import { normalizeFault, getPendingId } from './faultUtils.js';
 import { LiveEditProvider, Editable, useLiveEdit } from './liveEdit.jsx';
 import FaultEditModal from './faultEditModal.jsx';
@@ -761,7 +761,11 @@ function AppContent() {
         setModels(loadedModels);
         setCategories(loadedCats);
         setMotorTypes(loadedMotors);
-        setForum(loadedForum);
+        const forumWithDemoPosts = ensureDemoPostsForFaults(loadedData.map(f => f.id), loadedForum);
+        setForum(forumWithDemoPosts);
+        if (forumWithDemoPosts !== loadedForum) {
+          saveForum(forumWithDemoPosts);
+        }
         setArticles(loadedArticles);
 
         const initialNav = routeStateFromPath(loadedData, loadedModels) || safeGetHistoryState();

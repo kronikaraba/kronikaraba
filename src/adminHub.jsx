@@ -67,6 +67,7 @@ export default function AdminHub({
   const allPosts = useMemo(() => {
     const list = [];
     Object.entries(forum).forEach(([faultId, posts]) => {
+      if (!Array.isArray(posts)) return;
       const fault = faults.find(f => String(f.id) === String(faultId));
       const faultTitle = fault
         ? `${fault.brand} ${fault.model} — ${fault.fault || fault.description}`
@@ -282,6 +283,7 @@ export default function AdminHub({
                           {!p.isReply && p.type && (
                             <span className="admin-hub-type-tag">{POST_TYPE_LABELS[p.type] || p.type}</span>
                           )}
+                          {p.isDemo && <span className="admin-hub-type-tag">Demo yorum</span>}
                         </span>
                         <span className="admin-hub-meta">{p.username} · {getCommentDateLabel(p)}</span>
                       </div>

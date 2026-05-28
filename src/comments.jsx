@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { loadForum, saveForum, getAdminUsername } from './adminStorage.js';
 import { ForumPostImages, ForumImageAttach } from './ForumImages.jsx';
-import { formatDateTimeMinute, getCommentDateDisplay, getCommentDateLabel, getFaultActivityInfo } from './dateUtils.js';
+import { formatDateTimeMinute, getCommentDateDisplay, getCommentDateLabel, getFaultActivityInfo, useNow } from './dateUtils.js';
 
 // ── Seed data — pre-filled forum posts per fault id ──────────────────────────
 const SEED = {
@@ -73,6 +73,38 @@ const POST_TYPES = [
   { value: 'usta',   label: 'Usta Önerisi',  desc: 'Uzman tavsiyesi' },
 ];
 
+const MIN_VISIBLE_POSTS = 5;
+const DEMO_META_KEY = '__demoSeededFaults';
+
+const DEMO_POST_TEMPLATES = [
+  {
+    type: 'yorum',
+    username: 'Demo Kullanici 01',
+    text: 'Benzer basliklarda ilk bakilacak sey bakim gecmisi gibi duruyor. Ozellikle km ve yag degisim araligi atlanmamali.',
+  },
+  {
+    type: 'soru',
+    username: 'Demo Kullanici 02',
+    text: 'Bu belirti surekli mi yoksa sadece sogukta mi cikiyor, onu yazmak lazim bence. Teshis baya degisiyor.',
+  },
+  {
+    type: 'oneri',
+    username: 'Demo Kullanici 03',
+    text: 'Ekspertize giderken ariza kodlarini da okutmak iyi olur. Sadece test surusu bazen yetmiyo.',
+  },
+  {
+    type: 'yorum',
+    username: 'Demo Kullanici 04',
+    text: 'Parca fiyati cok oynuyor, ayni islem icin sanayi ve yetkili servis arasinda ciddi fark cikabiliyor.',
+  },
+  {
+    type: 'usta',
+    username: 'Demo Usta Notu',
+    isUsta: true,
+    text: 'Kontrol sirasini basit tutmak lazim: once kacak ve soketler, sonra canli degerler, en son parca degisimi. Direk parca almak masrafi buyutur.',
+  },
+];
+
 function typeConfig(type) {
   switch (type) {
     case 'usta':  return { icon: '', label: 'Usta Önerisi', cls: 'post-usta' };
@@ -84,9 +116,76 @@ function typeConfig(type) {
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 
+function seededForumIds(forum) {
+  const ids = forum?.[DEMO_META_KEY];
+  return Array.isArray(ids) ? ids.map(String) : [];
+}
+
+function isDemoSeeded(forum, faultId) {
+  return seededForumIds(forum).includes(String(faultId));
+}
+
+function storedPostsForFault(forum, faultId) {
+  const posts = forum?.[faultId];
+  if (Array.isArray(posts)) return posts;
+  return SEED[faultId] || [];
+}
+
+function buildDemoPost(faultId, index) {
+  const template = DEMO_POST_TEMPLATES[index % DEMO_POST_TEMPLATES.length];
+  const numericId = Number(String(faultId || '').replace(/\D/g, '')) || 1;
+  const day = ((numericId + index * 4) % 24) + 1;
+  const hour = 10 + ((numericId + index) % 8);
+  const createdAt = new Date(2026, 3, day, hour, (index * 11) % 60).toISOString();
+  return {
+    id: `demo-${faultId}-${index + 1}`,
+    type: template.type,
+    username: template.username,
+    isUsta: Boolean(template.isUsta),
+    isDemo: true,
+    text: template.text,
+    date: formatDateTimeMinute(createdAt),
+    createdAt,
+    updatedAt: createdAt,
+    helpful: 0,
+    voters: [],
+    replies: [],
+  };
+}
+
+function withDemoPosts(faultId, posts) {
+  const basePosts = Array.isArray(posts) ? posts : [];
+  const needed = Math.max(0, MIN_VISIBLE_POSTS - basePosts.length);
+  if (!needed) return basePosts;
+  return [
+    ...basePosts,
+    ...Array.from({ length: needed }, (_, index) => buildDemoPost(faultId, index)),
+  ];
+}
+
+function ensureDemoPostsForFault(forum, faultId) {
+  const key = String(faultId);
+  if (isDemoSeeded(forum, key)) return forum;
+
+  return {
+    ...forum,
+    [key]: withDemoPosts(key, storedPostsForFault(forum, key)),
+    [DEMO_META_KEY]: [...new Set([...seededForumIds(forum), key])],
+  };
+}
+
+export function ensureDemoPostsForFaults(faultIds, forum = {}) {
+  let nextForum = forum || {};
+  for (const faultId of faultIds || []) {
+    nextForum = ensureDemoPostsForFault(nextForum, faultId);
+  }
+  return nextForum;
+}
+
 export function getForumPostsForFault(faultId, loadedForum) {
   const stored = loadedForum || {};
-  return stored[faultId] || SEED[faultId] || [];
+  const posts = storedPostsForFault(stored, faultId);
+  return isDemoSeeded(stored, faultId) ? posts : withDemoPosts(faultId, posts);
 }
 
 export function getCommentCount(faultId, loadedForum) {
@@ -114,6 +213,7 @@ export function buildFaultActivityMap(faults, loadedForum) {
 
 // ── Reply item ────────────────────────────────────────────────────────────────
 function ReplyItem({ reply, user, onVote, adminMode, onAdminDeleteReply, onAdminEditReply }) {
+  const now = useNow();
   const voted = user && (reply.voters || []).includes(user.id);
   const exactDate = getCommentDateLabel(reply);
   return (
@@ -123,7 +223,7 @@ function ReplyItem({ reply, user, onVote, adminMode, onAdminDeleteReply, onAdmin
         <div className="forum-meta">
           <span className="forum-author">{reply.username}</span>
           {reply.isUsta && <span className="usta-tag">Usta</span>}
-          <span className="forum-date" title={`Yorum tarihi: ${exactDate}`}>{getCommentDateDisplay(reply)}</span>
+          <span className="forum-date" title={`Yorum tarihi: ${exactDate}`}>{getCommentDateDisplay(reply, now)}</span>
           {adminMode && (
             <span className="forum-reply-admin-actions">
               <button type="button" className="forum-reply-btn forum-admin-btn" onClick={() => onAdminEditReply(reply)} title="Yanıtı Düzenle">
@@ -157,6 +257,7 @@ function ReplyItem({ reply, user, onVote, adminMode, onAdminDeleteReply, onAdmin
 
 // ── Post item ─────────────────────────────────────────────────────────────────
 function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, adminMode, onAdminDelete, onAdminEdit, onAdminDeleteReply, onAdminEditReply }) {
+  const now = useNow();
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [replyImages, setReplyImages] = useState([]);
@@ -185,6 +286,7 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
       <div className="forum-post-type-bar">
         {cfg.icon && <span className="post-type-icon">{cfg.icon}</span>}
         <span className="post-type-label">{cfg.label}</span>
+        {post.isDemo && <span className="demo-comment-badge">Demo yorum</span>}
         {post.isUsta && <span className="usta-verified">✓ Doğrulanmış Usta</span>}
         {adminMode && <span className="forum-admin-badge">🛡 Yönetici Modu</span>}
       </div>
@@ -194,8 +296,9 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
         <div className="forum-post-content">
           <div className="forum-meta">
             <span className="forum-author">{post.username}</span>
+            {post.isDemo && <span className="demo-comment-tag">Demo</span>}
             {post.isUsta && <span className="usta-tag">Usta</span>}
-            <span className="forum-date" title={`Yorum tarihi: ${exactDate}`}>{getCommentDateDisplay(post)}</span>
+            <span className="forum-date" title={`Yorum tarihi: ${exactDate}`}>{getCommentDateDisplay(post, now)}</span>
           </div>
           {post.text ? <p className="forum-text">{post.text}</p> : null}
           <ForumPostImages images={post.images} />
@@ -298,17 +401,13 @@ export function CommentSection({ faultId, user, onAuthRequest, adminMode: adminM
   const [activeTab, setActiveTab] = useState('all');
   const [editPost, setEditPost] = useState(null);   // { postId, replyId?, text, isReply }
 
-  const posts = forum ? (forum[faultId] || []) : [];
+  const posts = forum ? getForumPostsForFault(faultId, forum) : [];
 
   useEffect(() => {
     async function loadData() {
       try {
         const stored = await loadForum();
-        const merged = { ...stored };
-        if (SEED[faultId] && !stored[faultId]) {
-          merged[faultId] = SEED[faultId];
-        }
-        setForum(merged);
+        setForum(ensureDemoPostsForFault({ ...stored }, faultId));
       } catch (err) {
         console.error("Failed to load forum comments", err);
       } finally {
