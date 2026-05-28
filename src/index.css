@@ -29,7 +29,7 @@
   --green: #16A34A;
   --green-bg: #DCFCE7;
   --green-text: #14532D;
-  --navbar-h: 58px;
+  --navbar-h: 68px;
   --sidebar-w: 220px;
   --font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
@@ -95,8 +95,8 @@ h6 {
 .navbar-logo-img {
   display: block;
   width: auto;
-  height: 42px;
-  max-width: 150px;
+  height: 56px;
+  max-width: 195px;
   object-fit: contain;
   object-position: left center;
 }
@@ -2567,7 +2567,7 @@ h6 {
 ═════════════════════════════════════ */
 @media (max-width: 640px) {
   :root {
-    --navbar-h: 52px;
+    --navbar-h: 58px;
   }
 
   /* Navbar */
@@ -2581,8 +2581,8 @@ h6 {
   }
 
   .navbar-logo-img {
-    height: 34px;
-    max-width: 112px;
+    height: 44px;
+    max-width: 145px;
   }
 
   .logo-badge {
