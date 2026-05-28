@@ -58,12 +58,6 @@ function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, o
         <a href="/markalar" className={`nav-link${activeView === 'markalar' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('brands'); }}>
           <Editable value={nb.navLinks.brands} path={['navbar', 'navLinks', 'brands']} />
         </a>
-        <a href="/uzman-gorusleri" className={`nav-link${activeView === 'uzman' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('uzman'); }}>
-          <Editable value={nb.navLinks.uzman} path={['navbar', 'navLinks', 'uzman']} />
-        </a>
-        <a href="/masraf" className={`nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
-          <Editable value={nb.navLinks.masraf} path={['navbar', 'navLinks', 'masraf']} />
-        </a>
         <a href="/makaleler" className={`nav-link${activeView === 'articles' || activeView === 'articleDetail' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('articles'); }}>
           <Editable value={nb.navLinks.articles || 'Makaleler'} path={['navbar', 'navLinks', 'articles']} />
         </a>
@@ -267,12 +261,6 @@ function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpen
           </a>
           <a href="/markalar" className={`sidebar-nav-link${activeView === 'markalar' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('brands'); }}>
             <span>🏢</span> {nb.navLinks.brands}
-          </a>
-          <a href="/uzman-gorusleri" className={`sidebar-nav-link${activeView === 'uzman' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('uzman'); }}>
-            <span>🔍</span> {nb.navLinks.uzman}
-          </a>
-          <a href="/masraf" className={`sidebar-nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
-            <span>💰</span> {nb.navLinks.masraf}
           </a>
           <a href="/makaleler" className={`sidebar-nav-link${activeView === 'articles' || activeView === 'articleDetail' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('articles'); }}>
             <span>📰</span> {nb.navLinks.articles || 'Makaleler'}
