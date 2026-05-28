@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { uploadImageToCloud, MAX_UPLOAD_BYTES } from './imageUpload.js';
 
 const EMPTY_ARTICLE = {
   title: '',
@@ -6,14 +7,8 @@ const EMPTY_ARTICLE = {
   body: '',
   date: 'Bugün',
   tag: 'Rehber',
-  image: '/articles/paint-protection.png',
+  image: '',
 };
-
-const IMAGE_OPTIONS = [
-  { value: '/articles/paint-protection.png', label: 'Boya koruma görseli' },
-  { value: '/articles/fleet-safety.png', label: 'Filo güvenliği görseli' },
-  { value: '/articles/vehicle-check.png', label: 'Araç kontrol görseli' },
-];
 
 function slugify(value) {
   return String(value || '')
@@ -33,9 +28,33 @@ function slugify(value) {
 export default function ArticleEditModal({ article, onSave, onClose }) {
   const [form, setForm] = useState(() => ({ ...EMPTY_ARTICLE, ...(article || {}) }));
   const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const fileInputRef = useRef(null);
+
   const set = (key, value) => {
     setForm(prev => ({ ...prev, [key]: value }));
     setError('');
+  };
+
+  const handleImagePick = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError('');
+    setUploading(true);
+    try {
+      const result = await uploadImageToCloud(file);
+      set('image', result.url);
+    } catch (err) {
+      setUploadError(err.message || 'Görsel yüklenemedi.');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const removeImage = () => {
+    set('image', '');
   };
 
   const submit = (e) => {
@@ -53,7 +72,7 @@ export default function ArticleEditModal({ article, onSave, onClose }) {
       body: form.body.trim(),
       date: form.date.trim() || 'Bugün',
       tag: form.tag.trim() || 'Rehber',
-      image: form.image.trim() || EMPTY_ARTICLE.image,
+      image: (form.image || '').trim(),
       createdAt: form.createdAt || now,
       updatedAt: now,
     });
@@ -90,24 +109,68 @@ export default function ArticleEditModal({ article, onSave, onClose }) {
               <label>İçerik *</label>
               <textarea value={form.body} onChange={e => set('body', e.target.value)} rows={10} placeholder="Detay sayfasında yayınlanacak uzun makale metni" required />
             </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Hazır görsel</label>
-                <select value={IMAGE_OPTIONS.some(opt => opt.value === form.image) ? form.image : ''} onChange={e => e.target.value && set('image', e.target.value)}>
-                  <option value="" disabled>Görsel seçin</option>
-                  {IMAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Görsel yolu</label>
-                <input value={form.image} onChange={e => set('image', e.target.value)} placeholder="/articles/vehicle-check.png" />
+
+            {/* ── Image upload (same pattern as forum comments) ── */}
+            <div className="form-group">
+              <label>Kapak Görseli</label>
+              <div className="article-image-attach">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                  className="forum-image-input-hidden"
+                  disabled={uploading}
+                  onChange={handleImagePick}
+                />
+
+                {form.image ? (
+                  <div className="article-image-preview-wrap">
+                    <div className="article-image-preview">
+                      <img src={form.image} alt="Kapak görseli" />
+                      <button
+                        type="button"
+                        className="forum-image-remove"
+                        onClick={removeImage}
+                        aria-label="Görseli kaldır"
+                        title="Görseli kaldır"
+                      >×</button>
+                    </div>
+                    <button
+                      type="button"
+                      className="article-image-change-btn"
+                      disabled={uploading}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {uploading ? 'Yükleniyor…' : '📷 Görseli Değiştir'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="article-image-pick-btn"
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {uploading ? (
+                      <>
+                        <span className="article-upload-spinner" />
+                        Yükleniyor…
+                      </>
+                    ) : (
+                      <>📷 Kapak görseli yükle</>
+                    )}
+                  </button>
+                )}
+                <span className="forum-image-hint">JPG, PNG, WebP · max 5 MB</span>
+                {uploadError && <p className="forum-image-error">{uploadError}</p>}
               </div>
             </div>
+
             {error && <p className="form-error">{error}</p>}
           </div>
           <div className="modal-footer">
             <button type="button" className="btn-cancel" onClick={onClose}>İptal</button>
-            <button type="submit" className="btn-submit">Kaydet</button>
+            <button type="submit" className="btn-submit" disabled={uploading}>Kaydet</button>
           </div>
         </form>
       </div>
