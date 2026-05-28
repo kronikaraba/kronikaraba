@@ -76,7 +76,7 @@ const POST_TYPES = [
 const MIN_VISIBLE_POSTS = 5;
 const SEED_META_KEY = '__seededFaults';
 const SEED_VERSION_KEY = '__commentVersion';
-const COMMENT_VERSION = 'vehicle-research-v3-natural';
+const COMMENT_VERSION = 'vehicle-research-v3-natural-past';
 
 const POST_TEMPLATES = [
   {

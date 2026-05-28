@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+
 import { riskLevels } from './data.js';
 import { loadCategories, loadMotorTypes } from './siteContent.js';
 import { AuthModal, loadUser, logout } from './auth.jsx';
@@ -16,7 +17,7 @@ import ArticlesPage, { ArticleDetailPage } from './ArticlesPage.jsx';
 import ArticleEditModal from './ArticleEditModal.jsx';
 import LandingPage from './LandingPage.jsx';
 import UserFaultSuggestModal from './UserFaultSuggestModal.jsx';
-import { getFaultActivityInfo } from './dateUtils.js';
+import { getFaultActivityInfo, formatRelativeTime, useNow } from './dateUtils.js';
 import { popularModelTags } from './popularModels.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -130,18 +131,21 @@ function UserMenu({ user, onLogout }) {
     setOpen(false);
   };
 
+  const username = user?.username || 'Kullanıcı';
+  const initial = username ? username[0].toUpperCase() : '?';
+
   return (
     <div className="user-menu">
       <button className="user-avatar-btn" onClick={() => setOpen(o => !o)}>
-        <div className="avatar-circle">{user.username[0].toUpperCase()}</div>
-        <span>{user.username}</span>
+        <div className="avatar-circle">{initial}</div>
+        <span>{username}</span>
       </button>
       {open && (
         <div className="user-dropdown" onClick={() => setOpen(false)}>
           <div className="user-dropdown-item" style={{ fontWeight: 700, color: 'var(--gray-900)', cursor: 'default' }}>
-            👤 {user.username}
+            👤 {username}
           </div>
-          <div className="user-dropdown-item" style={{ fontSize: 11, color: 'var(--gray-400)', cursor: 'default' }}>{user.email}</div>
+          <div className="user-dropdown-item" style={{ fontSize: 11, color: 'var(--gray-400)', cursor: 'default' }}>{user?.email || ''}</div>
           {isAdminUser && (
             <>
               <div className="user-dropdown-sep" />
@@ -482,10 +486,22 @@ const CAT_ICONS = {
 // ── Fault Card (forum thread row style) ───────────────────────────────────────────
 function FaultCard({ fault, user, onAuthRequest, onModelClick, onEdit, onDelete, adminMode, onClick, commentCount: commentCountProp, activity }) {
   const { editMode } = useLiveEdit();
+  const now = useNow();
   const showAdmin = adminMode && editMode;
   const catIcon = CAT_ICONS[fault.category] || '🔧';
   const commentCount = commentCountProp != null ? commentCountProp : getCommentCount(fault.id);
-  const faultActivity = activity || getFaultActivityInfo(fault);
+  const faultActivity = useMemo(() => {
+    if (!activity) return getFaultActivityInfo(fault, [], now);
+    // Keep the cached timestamp (which includes forum posts) but recompute
+    // relative time labels with fresh 'now' so they update every minute
+    const relative = formatRelativeTime(activity.timestamp, fault?.id, now);
+    return {
+      ...activity,
+      relative,
+      shortLabel: `${relative} ${activity.label}`,
+      fullLabel: `${relative} ${activity.label} · ${activity.exact}`,
+    };
+  }, [activity, fault, now]);
 
   return (
     <article 
@@ -603,6 +619,7 @@ function ActivePills({ filters, onFilters }) {
 
 // ── Sort ──────────────────────────────────────────────────────────────────────
 const SORT_OPTIONS = [
+  { value: 'activity-desc', label: 'Son Güncellenen' },
   { value: 'reports-desc', label: 'En Çok Doğrulanan' },
   { value: 'cost-desc', label: 'En Yüksek Masraf' },
   { value: 'cost-asc', label: 'En Düşük Masraf' },
@@ -610,9 +627,14 @@ const SORT_OPTIONS = [
   { value: 'brand-asc', label: 'Marka (A→Z)' },
 ];
 const RISK_ORDER = { YÜKSEK: 3, ORTA: 2, DÜŞÜK: 1 };
-function sortData(data, sort) {
+function sortData(data, sort, activityMap) {
   const d = [...data];
   switch (sort) {
+    case 'activity-desc': return d.sort((a, b) => {
+      const aTime = activityMap?.[a.id]?.timestamp || 0;
+      const bTime = activityMap?.[b.id]?.timestamp || 0;
+      return bTime - aTime || b.reportCount - a.reportCount;
+    });
     case 'reports-desc': return d.sort((a, b) => b.reportCount - a.reportCount);
     case 'cost-desc': return d.sort((a, b) => b.avgCost - a.avgCost);
     case 'cost-asc': return d.sort((a, b) => a.avgCost - b.avgCost);
@@ -801,7 +823,7 @@ function AppContent() {
   const initialRouteState = routeStateFromPath() || historyState || {};
 
   const [search, setSearch] = useState(() => initialRouteState.search || '');
-  const [sort, setSort] = useState('reports-desc');
+  const [sort, setSort] = useState('activity-desc');
   const [filters, setFilters] = useState(() => initialRouteState.filters || EMPTY_FILTERS);
   const [editFault, setEditFault] = useState(null);
   const [toast, setToast] = useState(null);
@@ -973,7 +995,7 @@ function AppContent() {
       setActiveView('home');
       setSearch('');
       setFilters(emptyFilters);
-      setSort('reports-desc');
+      setSort('activity-desc');
       setForceExplorer(false);
       pushNav({ activeView: 'home', selectedModel: null, selectedFaultId: null, selectedArticleId: null, forceExplorer: false, search: '', filters: emptyFilters });
     } else if (action === 'brands') {
@@ -1037,8 +1059,8 @@ function AppContent() {
     if (filters.costMax) d = d.filter(f => f.avgCost <= Number(filters.costMax));
     if (filters.risk) d = d.filter(f => f.risk === filters.risk);
     if (filters.minReports) d = d.filter(f => f.reportCount >= Number(filters.minReports));
-    return sortData(d, sort);
-  }, [data, search, filters, sort]);
+    return sortData(d, sort, faultActivityMap);
+  }, [data, search, filters, sort, faultActivityMap]);
 
   // Reset visible count when filters/search change
   useEffect(() => {

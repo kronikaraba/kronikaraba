@@ -107,7 +107,7 @@ async function apiSave(key, data) {
 // ── Site Content ─────────────────────────────────────────────────────────────
 export async function loadSiteContent() {
   const stored = await apiLoad('content');
-  if (!stored) return defaultSiteContent;
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return defaultSiteContent;
   return deepMerge(defaultSiteContent, stored);
 }
 
@@ -118,7 +118,7 @@ export async function saveSiteContent(data) {
 // ── Categories ────────────────────────────────────────────────────────────────
 export async function loadCategories() {
   const data = await apiLoad('categories');
-  return data || defaultCategories;
+  return Array.isArray(data) ? data : defaultCategories;
 }
 
 export async function saveCategories(data) {
@@ -128,7 +128,7 @@ export async function saveCategories(data) {
 // ── Motor Types ───────────────────────────────────────────────────────────────
 export async function loadMotorTypes() {
   const data = await apiLoad('motorTypes');
-  return data || defaultMotorTypes;
+  return Array.isArray(data) ? data : defaultMotorTypes;
 }
 
 export async function saveMotorTypes(data) {

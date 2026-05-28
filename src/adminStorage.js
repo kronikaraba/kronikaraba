@@ -111,7 +111,7 @@ export function adminLogout() {
 // Faults
 export async function loadAdminFaults() {
   const data = await apiLoad('faults');
-  return data || defaultFaults;
+  return Array.isArray(data) ? data : defaultFaults;
 }
 
 export async function saveAdminFaults(data) {
@@ -121,7 +121,7 @@ export async function saveAdminFaults(data) {
 // Models
 export async function loadAdminModels() {
   const data = await apiLoad('models');
-  return data || defaultModelDetails;
+  return (data && typeof data === 'object' && !Array.isArray(data)) ? data : defaultModelDetails;
 }
 
 export async function saveAdminModels(data) {
@@ -131,7 +131,7 @@ export async function saveAdminModels(data) {
 // Articles
 export async function loadArticles() {
   const data = await apiLoad('articles');
-  return data || defaultArticles;
+  return Array.isArray(data) ? data : defaultArticles;
 }
 
 export async function saveArticles(data) {
@@ -141,7 +141,7 @@ export async function saveArticles(data) {
 // Forum
 export async function loadForum() {
   const data = await apiLoad('forum');
-  return data || {};
+  return (data && typeof data === 'object' && !Array.isArray(data)) ? data : {};
 }
 
 export async function saveForum(data) {
@@ -151,7 +151,7 @@ export async function saveForum(data) {
 // Pending
 export async function loadPending() {
   const data = await apiLoad('pending');
-  return data || [];
+  return Array.isArray(data) ? data : [];
 }
 
 export async function savePending(data) {
@@ -161,7 +161,7 @@ export async function savePending(data) {
 // Users
 export async function loadUsers() {
   const data = await apiLoad('users');
-  return data || [];
+  return Array.isArray(data) ? data : [];
 }
 
 export async function saveUsers(data) {

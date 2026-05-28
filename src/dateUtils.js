@@ -9,11 +9,15 @@ export function useNow() {
   useEffect(() => {
     // Align first tick to the next whole minute so all instances stay in sync
     const msToNextMinute = 60000 - (Date.now() % 60000);
-    let timer = setTimeout(() => {
+    let intervalId = null;
+    const timeoutId = setTimeout(() => {
       setNow(new Date());
-      timer = setInterval(() => setNow(new Date()), 60000);
+      intervalId = setInterval(() => setNow(new Date()), 60000);
     }, msToNextMinute);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timeoutId);
+      if (intervalId !== null) clearInterval(intervalId);
+    };
   }, []);
   return now;
 }
@@ -32,7 +36,7 @@ function seededDateFromId(id) {
   const day = ((n - 1) % 28) + 1;
   const hour = 9 + (n % 10);
   const minute = (n * 7) % 60;
-  return new Date(2026, 4, day, hour, minute);
+  return new Date(2026, 2, day, hour, minute);
 }
 
 function parseDateValue(value) {

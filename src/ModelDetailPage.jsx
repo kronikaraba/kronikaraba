@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { CommentSection } from './comments.jsx';
-import { getFaultDateLabel } from './dateUtils.js';
+import { getFaultDateLabel, getFaultActivityInfo, formatRelativeTime, useNow } from './dateUtils.js';
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 const fmtCost = (min, max) => `₺${fmt(min)} – ₺${fmt(max)}`;
@@ -147,6 +147,7 @@ export default function ModelDetailPage({
   model, models, faults, activityMap = {}, adminMode,
   onBack, onEditModel, onCreateModel, user, onAuthRequest, onForumChange,
 }) {
+  const now = useNow();
   const modelFaults = useMemo(() => faults.filter(f => f.model === model), [faults, model]);
   const storedDetail = useMemo(() => models[model], [models, model]);
   const detail = useMemo(() => storedDetail || buildFallbackModelDetail(model, modelFaults), [storedDetail, model, modelFaults]);
@@ -296,15 +297,22 @@ export default function ModelDetailPage({
 
         {activeTab === 'faults' && (
           <div className="detail-section detail-fade-in">
-            {modelFaults.map(fault => (
-              <div key={fault.id} className="detail-fault-card">
-                <div className="dfc-header">
-                  <div>
-                    <h3 className="dfc-title">{fault.description}</h3>
-                    <p className="dfc-category">
-                      {fault.category} · {fault.year} · Kayıt: {getFaultDateLabel(fault)} · Son hareket: {activityMap[fault.id]?.fullLabel || getFaultDateLabel(fault)}
-                    </p>
-                  </div>
+            {modelFaults.map(fault => {
+              const activity = activityMap[fault.id];
+              const activityLabel = (() => {
+                if (!activity) return getFaultActivityInfo(fault, [], now).fullLabel;
+                const relative = formatRelativeTime(activity.timestamp, fault.id, now);
+                return `${relative} ${activity.label} · ${activity.exact}`;
+              })();
+              return (
+                <div key={fault.id} className="detail-fault-card">
+                  <div className="dfc-header">
+                    <div>
+                      <h3 className="dfc-title">{fault.description}</h3>
+                      <p className="dfc-category">
+                        {fault.category} · {fault.year} · Kayıt: {getFaultDateLabel(fault)} · Son hareket: {activityLabel}
+                      </p>
+                    </div>
                   <span className={`risk-badge ${fault.risk}`}>{fault.risk}</span>
                 </div>
                 <div className="dfc-body">
@@ -331,8 +339,9 @@ export default function ModelDetailPage({
                   <CommentSection faultId={fault.id} fault={fault} user={user} onAuthRequest={onAuthRequest} adminMode={adminMode} onForumChange={onForumChange} />
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
+        </div>
         )}
 
         {activeTab === 'maintenance' && (

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Editable } from './liveEdit.jsx';
-import { getFaultDateLabel } from './dateUtils.js';
+import { getFaultDateLabel, getFaultActivityInfo, formatRelativeTime, useNow } from './dateUtils.js';
 import { popularModelTags } from './popularModels.js';
 
 export default function LandingPage({
@@ -16,6 +16,7 @@ export default function LandingPage({
   activityMap = {},
 }) {
   const [searchVal, setSearchVal] = useState('');
+  const now = useNow();
   const lp = content?.landing || {};
 
   const brandCount = useMemo(() => [...new Set(data.map(f => f.brand))].length, [data]);
@@ -195,8 +196,11 @@ export default function LandingPage({
                         <span className="lp-tr-dot">·</span>
                         <span className="lp-tr-title">{f.description || f.fault}</span>
                         <span className="lp-tr-dot">·</span>
-                        <span className="lp-tr-activity" title={`Son hareket: ${activity?.exact || getFaultDateLabel(f)}`}>
-                          {activity?.fullLabel || `Kayıt: ${getFaultDateLabel(f)}`}
+                        <span className="lp-tr-activity" title={`Son hareket: ${activity?.exact || getFaultActivityInfo(f, [], now).exact}`}>
+                          {activity
+                            ? `${formatRelativeTime(activity.timestamp, f.id, now)} ${activity.label} · ${activity.exact}`
+                            : `${formatRelativeTime(f.createdAt || f.publishedAt || f.suggestedAt, f.id, now)} kayıt açıldı · ${getFaultDateLabel(f)}`
+                          }
                         </span>
                       </div>
                       <div className="lp-tr-meta">

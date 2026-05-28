@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { CommentSection } from './comments.jsx';
 import { useLiveEdit } from './liveEdit.jsx';
-import { getFaultDateLabel } from './dateUtils.js';
+import { getFaultDateLabel, getFaultActivityInfo, formatRelativeTime, useNow } from './dateUtils.js';
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 const fmtCost = (min, max) => `₺${fmt(min)} – ₺${fmt(max)}`;
@@ -23,9 +23,20 @@ export default function FaultDetailPage({ fault, activity, user, onAuthRequest, 
   // Yorum yönetimi: admin girişi yeterli, editMode şartsız
   const commentAdminMode = authed || (adminMode && editMode);
   const catIcon = CAT_ICONS[fault.category] || '🔧';
+  const now = useNow();
   const faultDate = getFaultDateLabel(fault);
-  const activityLabel = activity?.fullLabel || `Kayıt: ${faultDate}`;
-  const activityExact = activity?.exact || faultDate;
+  const faultActivity = useMemo(() => {
+    if (!activity) return getFaultActivityInfo(fault, [], now);
+    const relative = formatRelativeTime(activity.timestamp, fault?.id, now);
+    return {
+      ...activity,
+      relative,
+      shortLabel: `${relative} ${activity.label}`,
+      fullLabel: `${relative} ${activity.label} · ${activity.exact}`,
+    };
+  }, [activity, fault, now]);
+  const activityLabel = faultActivity.fullLabel;
+  const activityExact = faultActivity.exact;
 
   // Verify state — check localStorage for per-user per-fault tracking
   const verifyKey = `ka_verified_${fault.id}`;
