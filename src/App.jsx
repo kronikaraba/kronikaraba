@@ -761,7 +761,7 @@ function AppContent() {
         setModels(loadedModels);
         setCategories(loadedCats);
         setMotorTypes(loadedMotors);
-        const forumWithDemoPosts = ensureDemoPostsForFaults(loadedData.map(f => f.id), loadedForum);
+        const forumWithDemoPosts = ensureDemoPostsForFaults(loadedData, loadedForum);
         setForum(forumWithDemoPosts);
         if (forumWithDemoPosts !== loadedForum) {
           saveForum(forumWithDemoPosts);

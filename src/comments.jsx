@@ -75,33 +75,35 @@ const POST_TYPES = [
 
 const MIN_VISIBLE_POSTS = 5;
 const DEMO_META_KEY = '__demoSeededFaults';
+const DEMO_VERSION_KEY = '__demoCommentVersion';
+const DEMO_COMMENT_VERSION = 'vehicle-research-v2';
 
 const DEMO_POST_TEMPLATES = [
   {
     type: 'yorum',
     username: 'Demo Kullanici 01',
-    text: 'Benzer basliklarda ilk bakilacak sey bakim gecmisi gibi duruyor. Ozellikle km ve yag degisim araligi atlanmamali.',
+    text: ({ vehicle, fault }) => `${vehicle} icin arastirma notu: ${fault} basliginda ilk bakilacak yer bakim gecmisi ve arizanin hangi kmde basladigi. Bu bilgi olmadan yorum biraz havada kaliyor.`,
   },
   {
     type: 'soru',
     username: 'Demo Kullanici 02',
-    text: 'Bu belirti surekli mi yoksa sadece sogukta mi cikiyor, onu yazmak lazim bence. Teshis baya degisiyor.',
+    text: ({ vehicle, symptoms }) => `${vehicle} kullanicisindan beklenen bilgi: ${symptoms} belirtileri surekli mi, yoksa soguk ilk calistirmada mi cikiyor? Bence bunu yazmak teshisi cok degistirir.`,
   },
   {
     type: 'oneri',
     username: 'Demo Kullanici 03',
-    text: 'Ekspertize giderken ariza kodlarini da okutmak iyi olur. Sadece test surusu bazen yetmiyo.',
+    text: ({ vehicle, checkTip }) => `${vehicle} ekspertizinde sadece test surusu yetmiyor. Arastirma notu olarak sunu ekledim: ${checkTip}`,
   },
   {
     type: 'yorum',
     username: 'Demo Kullanici 04',
-    text: 'Parca fiyati cok oynuyor, ayni islem icin sanayi ve yetkili servis arasinda ciddi fark cikabiliyor.',
+    text: ({ vehicle, costText }) => `${vehicle} icin masraf araligi ${costText} gorunuyor. Ayni is icin servisler arasi fiyat cok oynayabilir, net fiyat almadan karar vermemek lazim.`,
   },
   {
     type: 'usta',
     username: 'Demo Usta Notu',
     isUsta: true,
-    text: 'Kontrol sirasini basit tutmak lazim: once kacak ve soketler, sonra canli degerler, en son parca degisimi. Direk parca almak masrafi buyutur.',
+    text: ({ vehicle, category, risk }) => `${vehicle} icin teknik not: ${category} tarafinda once basit kontroller, sonra canli veri/hata kodu bakilmali. Risk seviyesi ${risk}; direk parca degisimi masrafi buyutur.`,
   },
 ];
 
@@ -131,19 +133,56 @@ function storedPostsForFault(forum, faultId) {
   return SEED[faultId] || [];
 }
 
-function buildDemoPost(faultId, index) {
+function faultContext(faultOrId) {
+  if (faultOrId?.vehicle) return faultOrId;
+
+  if (faultOrId && typeof faultOrId === 'object') {
+    const vehicle = [faultOrId.brand, faultOrId.model].filter(Boolean).join(' ') || `Ariza #${faultOrId.id}`;
+    const fault = faultOrId.fault || faultOrId.description || 'bu ariza';
+    const symptoms = faultOrId.symptoms || 'belirti bilgileri';
+    const checkTip = faultOrId.checkTip || 'belirti, test surusu ve hata kodlari birlikte kontrol edilmeli.';
+    const costText = faultOrId.costMin && faultOrId.costMax
+      ? `${fmt(faultOrId.costMin)}-${fmt(faultOrId.costMax)} TL`
+      : 'servis teklifine gore degisiyor';
+    return {
+      id: faultOrId.id,
+      vehicle,
+      fault,
+      symptoms,
+      checkTip,
+      costText,
+      category: faultOrId.category || 'mekanik',
+      risk: faultOrId.risk || 'belirsiz',
+    };
+  }
+
+  return {
+    id: faultOrId,
+    vehicle: `Ariza #${faultOrId}`,
+    fault: 'bu ariza',
+    symptoms: 'belirti bilgileri',
+    checkTip: 'belirti, test surusu ve hata kodlari birlikte kontrol edilmeli.',
+    costText: 'servis teklifine gore degisiyor',
+    category: 'mekanik',
+    risk: 'belirsiz',
+  };
+}
+
+function buildDemoPost(faultOrId, index) {
+  const ctx = faultContext(faultOrId);
   const template = DEMO_POST_TEMPLATES[index % DEMO_POST_TEMPLATES.length];
-  const numericId = Number(String(faultId || '').replace(/\D/g, '')) || 1;
+  const numericId = Number(String(ctx.id || '').replace(/\D/g, '')) || 1;
   const day = ((numericId + index * 4) % 24) + 1;
   const hour = 10 + ((numericId + index) % 8);
   const createdAt = new Date(2026, 3, day, hour, (index * 11) % 60).toISOString();
   return {
-    id: `demo-${faultId}-${index + 1}`,
+    id: `demo-${ctx.id}-${index + 1}`,
     type: template.type,
     username: template.username,
     isUsta: Boolean(template.isUsta),
     isDemo: true,
-    text: template.text,
+    demoVersion: DEMO_COMMENT_VERSION,
+    text: typeof template.text === 'function' ? template.text(ctx) : template.text,
     date: formatDateTimeMinute(createdAt),
     createdAt,
     updatedAt: createdAt,
@@ -153,31 +192,48 @@ function buildDemoPost(faultId, index) {
   };
 }
 
-function withDemoPosts(faultId, posts) {
+function withDemoPosts(faultOrId, posts, refreshExisting = false) {
+  const ctx = faultContext(faultOrId);
   const basePosts = Array.isArray(posts) ? posts : [];
-  const needed = Math.max(0, MIN_VISIBLE_POSTS - basePosts.length);
-  if (!needed) return basePosts;
+  const normalizedPosts = refreshExisting
+    ? basePosts.map(post => {
+        const match = String(post?.id || '').match(new RegExp(`^demo-${ctx.id}-(\\d+)$`));
+        if (!post?.isDemo || !match) return post;
+        return {
+          ...buildDemoPost(ctx, Number(match[1]) - 1),
+          helpful: Number(post.helpful || 0),
+          voters: post.voters || [],
+          replies: post.replies || [],
+        };
+      })
+    : basePosts;
+  const needed = Math.max(0, MIN_VISIBLE_POSTS - normalizedPosts.length);
+  if (!needed) return normalizedPosts;
   return [
-    ...basePosts,
-    ...Array.from({ length: needed }, (_, index) => buildDemoPost(faultId, index)),
+    ...normalizedPosts,
+    ...Array.from({ length: needed }, (_, index) => buildDemoPost(ctx, normalizedPosts.length + index)),
   ];
 }
 
-function ensureDemoPostsForFault(forum, faultId) {
-  const key = String(faultId);
-  if (isDemoSeeded(forum, key)) return forum;
+function ensureDemoPostsForFault(forum, faultOrId, forceRefresh = false) {
+  const ctx = faultContext(faultOrId);
+  const key = String(ctx.id);
+  const needsRefresh = forceRefresh || forum?.[DEMO_VERSION_KEY] !== DEMO_COMMENT_VERSION;
+  if (isDemoSeeded(forum, key) && !needsRefresh) return forum;
 
   return {
     ...forum,
-    [key]: withDemoPosts(key, storedPostsForFault(forum, key)),
+    [key]: withDemoPosts(ctx, storedPostsForFault(forum, key), needsRefresh),
     [DEMO_META_KEY]: [...new Set([...seededForumIds(forum), key])],
+    [DEMO_VERSION_KEY]: DEMO_COMMENT_VERSION,
   };
 }
 
-export function ensureDemoPostsForFaults(faultIds, forum = {}) {
+export function ensureDemoPostsForFaults(faultsOrIds, forum = {}) {
   let nextForum = forum || {};
-  for (const faultId of faultIds || []) {
-    nextForum = ensureDemoPostsForFault(nextForum, faultId);
+  const needsRefresh = nextForum?.[DEMO_VERSION_KEY] !== DEMO_COMMENT_VERSION;
+  for (const faultOrId of faultsOrIds || []) {
+    nextForum = ensureDemoPostsForFault(nextForum, faultOrId, needsRefresh);
   }
   return nextForum;
 }
