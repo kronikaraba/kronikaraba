@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://kronikariza.com/sitemap.xml
+Sitemap: https://kronikaraba.vercel.app/sitemap.xml

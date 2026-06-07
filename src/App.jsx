@@ -20,6 +20,8 @@ import AllModelsPage from './AllModelsPage.jsx';
 import UserFaultSuggestModal from './UserFaultSuggestModal.jsx';
 import { getDateTimeMs, getFaultActivityInfo, formatRelativeTime, useNow } from './dateUtils.js';
 import { popularModelTags } from './popularModels.js';
+import { updateMeta, getPageMeta } from './seoUtils.js';
+import { SkeletonList } from './SkeletonLoader.jsx';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
@@ -78,7 +80,7 @@ function buildStoredModelRecord({ model, brand, source = {}, seedFault = {}, now
 }
 
 // ── Navbar ────────────────────────────────────────────────────────────────────
-function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, onLogout, onMenuToggle, onLogoClick, onNavAction, activeView, onSuggest }) {
+function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, onLogout, onMenuToggle, onLogoClick, onNavAction, activeView, onSuggest, darkMode, onToggleDark }) {
   const nb = content.navbar;
   const { editMode, authed } = useLiveEdit();
 
@@ -171,6 +173,27 @@ function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, o
             </>
           )}
         </div>
+        <button
+          id="btn-dark-mode"
+          className="btn-dark-toggle"
+          onClick={onToggleDark}
+          aria-label={darkMode ? 'Aydınlık moda geç' : 'Karanlık moda geç'}
+          title={darkMode ? 'Aydınlık Mod' : 'Karanlık Mod'}
+        >
+          {darkMode ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          )}
+        </button>
       </div>
     </nav>
   );
@@ -863,6 +886,17 @@ function AppContent() {
   const [forum, setForum] = useState({});
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => {
+    try { return localStorage.getItem('ka_dark_mode') === 'true'; } catch { return false; }
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+    try { localStorage.setItem('ka_dark_mode', String(darkMode)); } catch {}
+  }, [darkMode]);
+
+  const toggleDarkMode = useCallback(() => setDarkMode(d => !d), []);
+
 
   useEffect(() => {
     async function initAll() {
@@ -1052,17 +1086,15 @@ function AppContent() {
   const showLanding = activeView === 'home' && !search && !Object.values(filters).some(v => v !== '') && !forceExplorer;
 
   useEffect(() => {
-    const titles = {
-      home: 'KronikArıza — Araç Kronik Arıza Veritabanı',
-      markalar: 'Markalar | KronikAraba',
-      modeller: 'Tüm Modeller | KronikAraba',
-      uzman: 'Uzman Görüşleri | KronikAraba',
-      masraf: 'Masraf Hesaplama | KronikAraba',
-      articles: 'Makaleler | KronikAraba',
-      articleDetail: 'Makale | KronikAraba',
-    };
-    document.title = titles[activeView] || titles.home;
-  }, [activeView]);
+    // Skip meta update on detail pages — they manage their own meta
+    if (activeView === 'articleDetail') return;
+    if (selectedFault) return;
+    if (selectedModel) return;
+    const view = (activeView === 'home' && (search || forceExplorer || Object.values(filters).some(v => v !== ''))) ? 'arizalar' : activeView;
+    const meta = getPageMeta(view);
+    updateMeta(meta);
+  }, [activeView, selectedFault, selectedModel, search, forceExplorer, filters]);
+
 
   useEffect(() => {
     registerAdminCallbacks({
@@ -1223,35 +1255,21 @@ function AppContent() {
   // ── Loading screen (MUST be after all hooks to avoid Rules of Hooks violation) ──
   if (loading) {
     return (
-      <div className="app-loading-screen" style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        background: 'var(--gray-50, #f9fafb)',
-        fontFamily: 'Inter, system-ui, sans-serif'
-      }}>
-        <div className="app-loading-spinner" style={{
-          width: '40px',
-          height: '40px',
-          border: '3px solid var(--gray-200, #e5e7eb)',
-          borderTopColor: 'var(--primary-600, #2563eb)',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite',
-          marginBottom: '16px'
-        }} />
-        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--gray-800, #1f2937)', margin: 0 }}>
-          KronikArıza yükleniyor...
-        </h2>
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
+      <div className="app-loading-screen">
+        <div className="app-loading-navbar">
+          <div className="skeleton-line" style={{ width: 160, height: 36, borderRadius: 6 }} />
+          <div style={{ display: 'flex', gap: 8, flex: 1, margin: '0 24px' }}>
+            {[1,2,3,4,5,6].map(i => <div key={i} className="skeleton-line" style={{ width: 80, height: 28, borderRadius: 5 }} />)}
+          </div>
+          <div className="skeleton-line" style={{ width: 220, height: 34, borderRadius: 6 }} />
+        </div>
+        <div className="app-loading-body">
+          <SkeletonList count={8} />
+        </div>
       </div>
     );
   }
+
 
   const handleSaveFault = async (fault) => {
     const pendingId = fault._pendingId;
@@ -1422,7 +1440,10 @@ function AppContent() {
         activeView={activeView}
         onSuggest={openSuggest}
         onNavAction={handleNavAction}
+        darkMode={darkMode}
+        onToggleDark={toggleDarkMode}
       />
+
 
       {/* Mobile Menu / Sidebar (drawer) */}
       <Sidebar

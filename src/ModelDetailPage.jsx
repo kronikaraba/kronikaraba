@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { CommentSection } from './comments.jsx';
 import { getFaultDateLabel, getFaultActivityInfo, formatRelativeTime, useNow } from './dateUtils.js';
+import { updateMeta, injectJsonLd, removeJsonLd, buildModelJsonLd, getPageMeta } from './seoUtils.js';
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 const fmtCost = (min, max) => `₺${fmt(min)} – ₺${fmt(max)}`;
@@ -156,11 +157,18 @@ export default function ModelDetailPage({
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
-    const prev = document.title;
     const brand = modelFaults[0]?.brand || '';
-    document.title = `${brand} ${model} — Kronik Arızalar | KronikAraba`;
-    return () => { document.title = prev; };
-  }, [model, modelFaults]);
+    const title = `${brand} ${model} — Kronik Arızalar | KronikAraba`;
+    const description = `${brand} ${model} modelinde en sık görülen ${modelFaults.length} kronik arıza kaydı. ${detail?.blogIntro ? detail.blogIntro.slice(0, 120) + '...' : 'Tamir masrafları, belirtiler ve kontrol ipucu bilgileri.'}`;
+    const url = window.location.pathname;
+    updateMeta({ title, description, url, type: 'article' });
+    injectJsonLd(buildModelJsonLd(model, brand, modelFaults, detail));
+    return () => {
+      removeJsonLd();
+      const home = getPageMeta('home');
+      updateMeta(home);
+    };
+  }, [model, modelFaults, detail]);
   if (!detail) {
     return (
       <div className="detail-page">

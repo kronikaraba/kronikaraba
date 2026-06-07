@@ -3,6 +3,7 @@ import { CommentSection } from './comments.jsx';
 import { useLiveEdit } from './liveEdit.jsx';
 import { getFaultDateLabel, getFaultActivityInfo, formatRelativeTime, useNow } from './dateUtils.js';
 import { ForumPostImages } from './ForumImages.jsx';
+import { updateMeta, injectJsonLd, removeJsonLd, buildFaultJsonLd } from './seoUtils.js';
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 const fmtCost = (min, max) => `₺${fmt(min)} – ₺${fmt(max)}`;
@@ -70,9 +71,12 @@ export default function FaultDetailPage({ fault, activity, user, onAuthRequest, 
   };
 
   useEffect(() => {
-    const prev = document.title;
-    document.title = `${fault.description} — ${fault.brand} ${fault.model} | KronikAraba`;
-    return () => { document.title = prev; };
+    const title = `${fault.description} — ${fault.brand} ${fault.model} | KronikAraba`;
+    const description = `${fault.brand} ${fault.model} modelinde "${fault.description}" arızası: ${fault.symptoms || ''} Tahmini tamir masrafı ₺${Number(fault.costMin).toLocaleString('tr-TR')} – ₺${Number(fault.costMax).toLocaleString('tr-TR')}. ${fault.kmDisplay} civarında görülüyor.`.trim();
+    const url = window.location.pathname;
+    updateMeta({ title, description, url, type: 'article' });
+    injectJsonLd(buildFaultJsonLd(fault));
+    return () => { removeJsonLd(); };
   }, [fault]);
 
   return (

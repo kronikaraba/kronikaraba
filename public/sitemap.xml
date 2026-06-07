@@ -1,27 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://kronikariza.com/</loc>
+    <loc>https://kronikaraba.vercel.app/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://kronikariza.com/#markalar</loc>
+    <loc>https://kronikaraba.vercel.app/markalar</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://kronikaraba.vercel.app/modeller</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://kronikaraba.vercel.app/arizalar</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://kronikaraba.vercel.app/uzman-gorusleri</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kronikariza.com/#uzman</loc>
+    <loc>https://kronikaraba.vercel.app/masraf</loc>
     <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kronikariza.com/#masraf</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://kronikariza.com/makaleler</loc>
+    <loc>https://kronikaraba.vercel.app/makaleler</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
