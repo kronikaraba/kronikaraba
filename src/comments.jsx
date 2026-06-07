@@ -327,7 +327,6 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [replyImages, setReplyImages] = useState([]);
-  const [showReplies, setShowReplies] = useState(true);
   const cfg = typeConfig(post.type);
   const voted = user && (post.voters || []).includes(user.id);
   const exactDate = getCommentDateLabel(post);
@@ -348,23 +347,16 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
 
   return (
     <div className={`forum-post ${cfg.cls}`}>
-      {/* Post type banner */}
-      <div className="forum-post-type-bar">
-        {cfg.icon && <span className="post-type-icon">{cfg.icon}</span>}
-        <span className="post-type-label">{cfg.label}</span>
-
-        {post.isUsta && <span className="usta-verified">✓ Doğrulanmış Usta</span>}
-        {adminMode && <span className="forum-admin-badge">🛡 Yönetici Modu</span>}
-      </div>
-
       <div className="forum-post-body">
         <div className="forum-avatar lg">{(post.username || '?')[0].toUpperCase()}</div>
         <div className="forum-post-content">
           <div className="forum-meta">
+            <span className={`forum-type-badge forum-type-badge--${post.type}`}>{cfg.label}</span>
             <span className="forum-author">{post.username}</span>
-
             {post.isUsta && <span className="usta-tag">Usta</span>}
+            {post.isUsta && <span className="usta-verified">✓ Doğrulanmış Usta</span>}
             <span className="forum-date" title={`Yorum tarihi: ${exactDate}`}>{getCommentDateDisplay(post, now)}</span>
+            {adminMode && <span className="forum-admin-badge">Yönetici Modu</span>}
           </div>
           {post.text ? <p className="forum-text">{post.text}</p> : null}
           <ForumPostImages images={post.images} />
@@ -376,7 +368,8 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 4, verticalAlign: 'middle' }}>
                 <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
               </svg>
-              {post.helpful > 0 ? `${post.helpful} kişi faydalı buldu` : 'Faydalı'}
+              Faydalı
+              {post.helpful > 0 && <span className="forum-vote-count">{post.helpful}</span>}
             </button>
             <button className="forum-reply-btn" onClick={handleReplyClick}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 4, verticalAlign: 'middle' }}>
@@ -384,11 +377,6 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
               </svg>
               Yanıtla
             </button>
-            {(post.replies || []).length > 0 && (
-              <button className="forum-reply-btn" onClick={() => setShowReplies(s => !s)}>
-                {showReplies ? 'Yanıtları Gizle' : 'Yanıtları Göster'} ({(post.replies || []).length})
-              </button>
-            )}
             {adminMode && (
               <>
                 <button type="button" className="forum-reply-btn forum-admin-btn" onClick={() => onAdminEdit(post)} title="Konuyu Düzenle">
@@ -407,8 +395,8 @@ function ForumPost({ post, user, onVote, onVoteReply, onReply, onAuthRequest, ad
             )}
           </div>
 
-          {/* Replies */}
-          {showReplies && (post.replies || []).length > 0 && (
+          {/* Replies — always visible */}
+          {(post.replies || []).length > 0 && (
             <div className="forum-replies">
               {(post.replies || []).map(r => (
                 <ReplyItem

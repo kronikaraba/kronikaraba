@@ -145,12 +145,14 @@ function buildFallbackModelDetail(model, modelFaults) {
 
 export default function ModelDetailPage({
   model, models, faults, activityMap = {}, adminMode,
-  onBack, onEditModel, onCreateModel, user, onAuthRequest, onForumChange,
+  onBack, onEditModel, onCreateModel, onDeleteModel, onAddFault, user, onAuthRequest, onForumChange,
 }) {
   const now = useNow();
   const modelFaults = useMemo(() => faults.filter(f => f.model === model), [faults, model]);
   const storedDetail = useMemo(() => models[model], [models, model]);
   const detail = useMemo(() => storedDetail || buildFallbackModelDetail(model, modelFaults), [storedDetail, model, modelFaults]);
+  const modelImages = useMemo(() => (Array.isArray(detail?.images) ? detail.images : []), [detail]);
+  const heroImage = modelImages[0]?.url || '';
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
@@ -190,12 +192,21 @@ export default function ModelDetailPage({
           <button type="button" className="btn-submit btn-sm" onClick={() => onEditModel(model, detail)}>
             ✏️ Makaleyi düzenle
           </button>
+          <button type="button" className="btn-submit btn-sm" style={{ marginLeft: 8, background: 'var(--green, #16A34A)' }} onClick={() => onAddFault && onAddFault(modelFaults[0]?.brand, model)}>
+            + Arıza Ekle
+          </button>
+          <button type="button" className="btn-submit btn-sm" style={{ marginLeft: 8, background: 'var(--red, #DC2626)' }} onClick={() => onDeleteModel && onDeleteModel(model)}>
+            Model Sil
+          </button>
         </div>
       )}
       {adminMode && !storedDetail && (
         <div className="detail-admin-bar">
           <button type="button" className="btn-submit btn-sm" onClick={onCreateModel}>
             + Kalıcı model makalesi oluştur
+          </button>
+          <button type="button" className="btn-submit btn-sm" style={{ marginLeft: 8, background: 'var(--green, #16A34A)' }} onClick={() => onAddFault && onAddFault(modelFaults[0]?.brand, model)}>
+            + Arıza Ekle
           </button>
         </div>
       )}
@@ -228,12 +239,16 @@ export default function ModelDetailPage({
           </div>
         </div>
         <div className="detail-hero-visual">
-          <div className="hero-icon-circle">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
-              <path d="M5 17h14M5 17a2 2 0 01-2-2V9a2 2 0 012-2h1l2-3h8l2 3h1a2 2 0 012 2v6a2 2 0 01-2 2M7 17v1a1 1 0 001 1h1a1 1 0 001-1v-1M14 17v1a1 1 0 001 1h1a1 1 0 001-1v-1"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-          </div>
+          {heroImage ? (
+            <img className="hero-model-image" src={heroImage} alt={detail.heroTitle || model} />
+          ) : (
+            <div className="hero-icon-circle">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
+                <path d="M5 17h14M5 17a2 2 0 01-2-2V9a2 2 0 012-2h1l2-3h8l2 3h1a2 2 0 012 2v6a2 2 0 01-2 2M7 17v1a1 1 0 001 1h1a1 1 0 001-1v-1M14 17v1a1 1 0 001 1h1a1 1 0 001-1v-1"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </div>
+          )}
         </div>
       </div>
 

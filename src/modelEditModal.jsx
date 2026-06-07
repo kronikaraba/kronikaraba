@@ -1,26 +1,80 @@
 import { useState, useMemo, useEffect } from 'react';
+import { ForumImageAttach } from './ForumImages.jsx';
 
 const EMPTY_MODEL = {
-  heroTitle: '', heroSubtitle: '', blogIntro: '', buyerAdvice: '',
+  brand: '', heroTitle: '', heroSubtitle: '', blogIntro: '', buyerAdvice: '',
+  images: [],
   specs: { motor: '', beygir: '', tork: '', sanziman: '', yakit: '', hiz: '', agirlik: '', bagaj: '' },
   strengths: [''], weaknesses: [''],
   maintenanceTips: [{ km: '', tip: '' }],
 };
 
+function normalizeModelImages(value) {
+  const list = Array.isArray(value) ? value : (value ? [value] : []);
+
+  return list
+    .map((img, index) => {
+      if (typeof img === 'string') {
+        const url = img.trim();
+        return url ? { id: `model-img-${index}`, url, name: '' } : null;
+      }
+      const url = String(img?.url || '').trim();
+      if (!url) return null;
+      return {
+        id: String(img.id || `model-img-${index}`),
+        url,
+        name: String(img.name || ''),
+      };
+    })
+    .filter(Boolean);
+}
+
 export default function ModelEditModal({ modelKey, initial, models, faults, onSave, onClose }) {
   const [key, setKey] = useState(modelKey || '');
-  const [form, setForm] = useState(initial || EMPTY_MODEL);
+  const [form, setForm] = useState(() => {
+    if (initial) {
+      return {
+        ...EMPTY_MODEL,
+        ...initial,
+        brand: initial.brand || '',
+        images: normalizeModelImages(initial.images ?? initial.image),
+      };
+    }
+    // If modelKey is set, try to infer brand from existing faults
+    if (modelKey) {
+      const faultForModel = faults.find(f => f.model === modelKey);
+      return { ...EMPTY_MODEL, brand: faultForModel?.brand || '' };
+    }
+    return { ...EMPTY_MODEL };
+  });
   const [selectMode, setSelectMode] = useState('select');
+  const [uploadingImages, setUploadingImages] = useState(false);
+
+  // Get all unique brands from faults
+  const brandOptions = useMemo(() => {
+    return [...new Set(faults.map(f => f.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'));
+  }, [faults]);
 
   const unusedModels = useMemo(() => {
-    const all = [...new Set(faults.map(f => f.model))].sort();
+    let all = [...new Set(faults.map(f => f.model))].sort();
+    // If a brand is selected, filter models by that brand
+    if (form.brand) {
+      const brandModels = new Set(faults.filter(f => f.brand === form.brand).map(f => f.model));
+      all = all.filter(m => brandModels.has(m));
+    }
     return all.filter(m => !models[m]);
-  }, [faults, models]);
+  }, [faults, models, form.brand]);
 
   useEffect(() => {
     if (modelKey) setSelectMode('custom');
     else if (unusedModels.length === 0) setSelectMode('custom');
   }, [modelKey, unusedModels.length]);
+
+  const setBrand = (brand) => {
+    setForm(p => ({ ...p, brand }));
+    // Reset model selection when brand changes (only if not editing)
+    if (!modelKey) setKey('');
+  };
 
   const setSpec = (k, v) => setForm(p => ({ ...p, specs: { ...p.specs, [k]: v } }));
   const setList = (field, i, v) => setForm(p => {
@@ -36,9 +90,12 @@ export default function ModelEditModal({ modelKey, initial, models, faults, onSa
 
   const submit = (e) => {
     e.preventDefault();
+    if (uploadingImages) return;
     if (!key.trim()) return;
     onSave(key.trim(), {
       ...form,
+      brand: form.brand,
+      images: form.images?.length ? form.images : undefined,
       strengths: form.strengths.filter(s => s.trim()),
       weaknesses: form.weaknesses.filter(w => w.trim()),
       maintenanceTips: form.maintenanceTips.filter(m => m.km.trim() || m.tip.trim()),
@@ -54,13 +111,26 @@ export default function ModelEditModal({ modelKey, initial, models, faults, onSa
         </div>
         <form onSubmit={submit}>
           <div className="modal-body admin-scroll-body">
+            {/* Marka seçimi */}
+            <div className="form-group">
+              <label>Marka *</label>
+              {modelKey ? (
+                <input value={form.brand} disabled />
+              ) : (
+                <select value={form.brand} onChange={e => setBrand(e.target.value)} required>
+                  <option value="" disabled>Marka seçin</option>
+                  {brandOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              )}
+            </div>
+            {/* Model seçimi */}
             <div className="form-group">
               <label>Model adı * <small>(arıza kayıtlarındaki model ile aynı)</small></label>
               {modelKey ? (
                 <input value={key} disabled />
               ) : selectMode === 'select' && unusedModels.length > 0 ? (
                 <div className="form-row">
-                  <select value={key} onChange={e => setKey(e.target.value)} required style={{ flex: 1 }}>
+                  <select value={key} onChange={e => setKey(e.target.value)} required style={{ flex: 1 }} disabled={!form.brand}>
                     <option value="">Listeden seçin</option>
                     {unusedModels.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
@@ -68,7 +138,7 @@ export default function ModelEditModal({ modelKey, initial, models, faults, onSa
                 </div>
               ) : (
                 <div className="form-row">
-                  <input value={key} onChange={e => setKey(e.target.value)} placeholder="örn. Golf 1.4 TSI" required style={{ flex: 1 }} />
+                  <input value={key} onChange={e => setKey(e.target.value)} placeholder="örn. Golf 1.4 TSI" required style={{ flex: 1 }} disabled={!form.brand} />
                   {unusedModels.length > 0 && (
                     <button type="button" className="btn-cancel" onClick={() => setSelectMode('select')}>Listeden seç</button>
                   )}
@@ -82,6 +152,16 @@ export default function ModelEditModal({ modelKey, initial, models, faults, onSa
             <div className="form-group">
               <label>Alt başlık</label>
               <input value={form.heroSubtitle} onChange={e => setForm(p => ({ ...p, heroSubtitle: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Model görselleri</label>
+              <ForumImageAttach
+                images={form.images || []}
+                onChange={images => setForm(p => ({ ...p, images }))}
+                onUploadingChange={setUploadingImages}
+                buttonLabel="📷 Görsel ekle"
+                hint="Model, araç dış görünüşü veya iç mekan fotoğrafı · en fazla 3 · max 5 MB"
+              />
             </div>
             <div className="form-group">
               <label>Makale / tanıtım yazısı</label>
@@ -127,8 +207,10 @@ export default function ModelEditModal({ modelKey, initial, models, faults, onSa
             <button type="button" className="btn-link-sm" onClick={() => setForm(p => ({ ...p, maintenanceTips: [...p.maintenanceTips, { km: '', tip: '' }] }))}>+ Bakım ekle</button>
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn-cancel" onClick={onClose}>İptal</button>
-            <button type="submit" className="btn-submit">Kaydet</button>
+            <button type="button" className="btn-cancel" onClick={onClose} disabled={uploadingImages}>İptal</button>
+            <button type="submit" className="btn-submit" disabled={uploadingImages}>
+              {uploadingImages ? 'Görseller yükleniyor...' : 'Kaydet'}
+            </button>
           </div>
         </form>
       </div>

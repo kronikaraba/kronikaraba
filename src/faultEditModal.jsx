@@ -1,12 +1,42 @@
 import { useState, useMemo } from 'react';
 import { loadCategories, loadMotorTypes } from './siteContent.js';
 import { normalizeFault, parseYearRange, formatYearRange } from './faultUtils.js';
+import { ForumImageAttach } from './ForumImages.jsx';
 
 const EMPTY = {
   brand: '', model: '', year: '', motorType: 'Benzin',
   fault: '', symptoms: '', checkTip: '', risk: 'ORTA',
   costMin: '', costMax: '', kmDisplay: '', kmMin: '', reportCount: '1', category: 'Motor',
+  images: [],
 };
+
+function cleanText(value) {
+  return String(value || '').trim();
+}
+
+function getStoredModelBrand(modelName, detail) {
+  const directBrand = cleanText(detail?.brand);
+  if (directBrand) return directBrand;
+
+  const title = cleanText(detail?.heroTitle);
+  const name = cleanText(modelName);
+  if (title && name && title.toLocaleLowerCase('tr-TR').endsWith(name.toLocaleLowerCase('tr-TR'))) {
+    return cleanText(title.slice(0, title.length - name.length));
+  }
+
+  return '';
+}
+
+function storedModelExists(models, brand, model) {
+  const targetBrand = cleanText(brand);
+  const targetModel = cleanText(model);
+  if (!targetModel) return false;
+  return Object.entries(models || {}).some(([name, detail]) => {
+    if (name !== targetModel) return false;
+    const storedBrand = getStoredModelBrand(name, detail);
+    return !targetBrand || !storedBrand || storedBrand === targetBrand;
+  });
+}
 
 function initForm(fault) {
   if (!fault) return { ...EMPTY };
@@ -19,11 +49,12 @@ function initForm(fault) {
     costMax: fault.costMax ?? '',
     kmMin: fault.kmMin ?? '',
     reportCount: fault.reportCount ?? 1,
+    images: Array.isArray(fault.images) ? fault.images : [],
     _pendingId: fault._pendingId,
   };
 }
 
-export default function FaultEditModal({ fault, allFaults, onSave, onClose, categories, motorTypes, allowManualModel = false }) {
+export default function FaultEditModal({ fault, allFaults, models = {}, onSave, onClose, categories, motorTypes, allowManualModel = false }) {
   const isPending = Boolean(fault?._pendingId);
   const [form, setForm] = useState(() => initForm(fault));
   const [manualModel, setManualModel] = useState(() => (
@@ -31,27 +62,44 @@ export default function FaultEditModal({ fault, allFaults, onSave, onClose, cate
     && Boolean(fault?.brand)
     && Boolean(fault?.model)
     && !allFaults.some(f => f.brand === fault.brand && f.model === fault.model)
+    && !storedModelExists(models, fault.brand, fault.model)
   ));
   const [saving, setSaving] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
   const catOptions = categories || [];
   const motorOptions = motorTypes || [];
+  const storedModelEntries = useMemo(() => {
+    return Object.entries(models || {})
+      .map(([model, detail]) => ({ model, brand: getStoredModelBrand(model, detail) }))
+      .filter(item => item.model);
+  }, [models]);
   const brandOptions = useMemo(() => {
-    return [...new Set([...allFaults.map(f => f.brand), form.brand].filter(Boolean))]
+    return [...new Set([
+      ...allFaults.map(f => f.brand),
+      ...storedModelEntries.map(item => item.brand),
+      form.brand,
+    ].filter(Boolean))]
       .sort((a, b) => a.localeCompare(b, 'tr'));
-  }, [allFaults, form.brand]);
+  }, [allFaults, storedModelEntries, form.brand]);
   const modelOptions = useMemo(() => {
-    const models = allFaults.filter(f => f.brand === form.brand).map(f => f.model);
-    if (form.model && !models.includes(form.model)) models.push(form.model);
-    return [...new Set(models)].sort((a, b) => a.localeCompare(b, 'tr'));
-  }, [allFaults, form.brand, form.model]);
+    const options = [
+      ...allFaults.filter(f => f.brand === form.brand).map(f => f.model),
+      ...storedModelEntries.filter(item => item.brand === form.brand).map(item => item.model),
+    ];
+    if (form.model && !options.includes(form.model)) options.push(form.model);
+    return [...new Set(options)].sort((a, b) => a.localeCompare(b, 'tr'));
+  }, [allFaults, storedModelEntries, form.brand, form.model]);
 
   const setBrand = (brand) => {
     setForm(prev => ({
       ...prev,
       brand,
-      model: !manualModel && allFaults.some(f => f.brand === brand && f.model === prev.model) ? prev.model : '',
+      model: !manualModel && (
+        allFaults.some(f => f.brand === brand && f.model === prev.model)
+        || storedModelEntries.some(item => item.brand === brand && item.model === prev.model)
+      ) ? prev.model : '',
     }));
   };
 
@@ -73,11 +121,16 @@ export default function FaultEditModal({ fault, allFaults, onSave, onClose, cate
       setSubmitError('Maksimum masraf, minimumdan kucuk olamaz.');
       return;
     }
+    if (uploadingImages) {
+      setSubmitError('Görsel yüklemesi tamamlanmadan kaydedemezsiniz.');
+      return;
+    }
     const { yearMin, yearMax, year } = parseYearRange(form.year);
     setSaving(true);
     try {
       await onSave({
         ...form,
+        images: form.images?.length ? form.images : undefined,
         year,
         yearMin,
         yearMax,
@@ -172,6 +225,17 @@ export default function FaultEditModal({ fault, allFaults, onSave, onClose, cate
               <label>Kontrol ipucu</label>
               <input value={form.checkTip} onChange={e => set('checkTip', e.target.value)} placeholder="Alıcı veya servis neye baksın?" />
             </div>
+            <div className="form-group">
+              <label>Arıza görselleri</label>
+              <ForumImageAttach
+                images={form.images || []}
+                onChange={images => set('images', images)}
+                onUploadingChange={setUploadingImages}
+                disabled={saving}
+                buttonLabel="📷 Görsel ekle"
+                hint="Arıza, motor, uyarı ekranı veya parça fotoğrafı · en fazla 3 · max 5 MB"
+              />
+            </div>
             <div className="form-row">
               <div className="form-group">
                 <label>Min. masraf (₺)</label>
@@ -214,9 +278,9 @@ export default function FaultEditModal({ fault, allFaults, onSave, onClose, cate
             </div>
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn-cancel" onClick={onClose} disabled={saving}>İptal</button>
-            <button type="submit" className="btn-submit" disabled={costInvalid || saving}>
-              {saving ? 'Kaydediliyor...' : (isPending ? 'Yayınla' : 'Kaydet')}
+            <button type="button" className="btn-cancel" onClick={onClose} disabled={saving || uploadingImages}>İptal</button>
+            <button type="submit" className="btn-submit" disabled={costInvalid || saving || uploadingImages}>
+              {uploadingImages ? 'Görseller yükleniyor...' : saving ? 'Kaydediliyor...' : (isPending ? 'Yayınla' : 'Kaydet')}
             </button>
           </div>
         </form>

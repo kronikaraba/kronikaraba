@@ -21,6 +21,16 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Authentication check for uploads
+    const adminToken = process.env.ADMIN_API_TOKEN;
+    if (adminToken) {
+      const authHeader = req.headers['authorization'] || req.headers['x-admin-token'] || '';
+      const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+      if (bearerToken !== adminToken) {
+        return res.status(401).json({ error: 'Yükleme için yetkilendirme gerekli.' });
+      }
+    }
+
     const token = process.env.BLOB_READ_WRITE_TOKEN;
     if (!token) {
       return res.status(503).json({

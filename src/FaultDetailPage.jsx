@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { CommentSection } from './comments.jsx';
 import { useLiveEdit } from './liveEdit.jsx';
 import { getFaultDateLabel, getFaultActivityInfo, formatRelativeTime, useNow } from './dateUtils.js';
+import { ForumPostImages } from './ForumImages.jsx';
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 const fmtCost = (min, max) => `₺${fmt(min)} – ₺${fmt(max)}`;
@@ -25,6 +26,7 @@ export default function FaultDetailPage({ fault, activity, user, onAuthRequest, 
   const catIcon = CAT_ICONS[fault.category] || '🔧';
   const now = useNow();
   const faultDate = getFaultDateLabel(fault);
+  const faultImages = Array.isArray(fault.images) ? fault.images : [];
   const faultActivity = useMemo(() => {
     if (!activity) return getFaultActivityInfo(fault, [], now);
     const relative = formatRelativeTime(activity.timestamp, fault?.id, now);
@@ -114,6 +116,12 @@ export default function FaultDetailPage({ fault, activity, user, onAuthRequest, 
             <span className={`risk-badge ${fault.risk}`}>{fault.risk} Risk</span>
           </div>
         </div>
+        {faultImages.length > 0 && (
+          <div className="fd-fault-images">
+            <span className="fd-fault-images-label">Arıza görselleri</span>
+            <ForumPostImages images={faultImages} />
+          </div>
+        )}
       </div>
 
       {/* Info Grid — "İlk Mesaj" detayları */}

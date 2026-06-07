@@ -5,13 +5,35 @@ import { defaultArticles } from './articleData.js';
 export const ADMIN_KEY = 'ka_admin_session';
 export const ADMIN_PASS_KEY = 'ka_admin_password';
 export const ADMIN_USER_KEY = 'ka_admin_username';
-
-const DEFAULT_PASS = 'admin123';
-const DEFAULT_USER = 'admin';
+export const ADMIN_TOKEN_KEY = 'ka_admin_token';
 
 // ── API Helpers (with localStorage fallback) ─────────────────────────────────
 const API_BASE = '/api/data';
 const LS_PREFIX = 'ka_data_';
+const LS_DIRTY_PREFIX = 'ka_data_dirty_';
+
+/**
+ * Get the stored admin API token for authenticated requests.
+ */
+function getApiToken() {
+  try {
+    return localStorage.getItem(ADMIN_TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Build headers for API requests, including auth if available.
+ */
+function authHeaders(extra = {}) {
+  const token = getApiToken();
+  const headers = { ...extra };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 function lsLoad(key) {
   try {
@@ -28,12 +50,46 @@ function lsSave(key, data) {
   }
 }
 
+function lsIsDirty(key) {
+  try {
+    return localStorage.getItem(LS_DIRTY_PREFIX + key) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function lsSetDirty(key, dirty) {
+  try {
+    if (dirty) {
+      localStorage.setItem(LS_DIRTY_PREFIX + key, 'true');
+    } else {
+      localStorage.removeItem(LS_DIRTY_PREFIX + key);
+    }
+  } catch {}
+}
+
 async function apiLoad(key) {
   try {
-    const res = await fetch(`${API_BASE}?key=${key}`);
+    const res = await fetch(`${API_BASE}?key=${key}`, {
+      headers: authHeaders(),
+    });
+    if (res.status === 403) {
+      // Unauthorized — don't fallback to localStorage for protected keys
+      console.warn(`apiLoad(${key}): access denied`);
+      return null;
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    // Sync localStorage with API data so it stays fresh
+
+    const localData = lsLoad(key);
+    if (lsIsDirty(key) && localData != null) {
+      return localData;
+    }
+    if (data == null && localData != null) {
+      return localData;
+    }
+
+    // Sync localStorage with API data so it stays fresh when there are no unsynced local edits.
     if (data != null) lsSave(key, data);
     return data;
   } catch (err) {
@@ -48,13 +104,20 @@ async function apiSave(key, data) {
   try {
     const res = await fetch(API_BASE, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ key, data }),
     });
+    if (res.status === 401) {
+      console.warn(`apiSave(${key}): authentication required. Data saved to localStorage only.`);
+      lsSetDirty(key, true);
+      return false;
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    lsSetDirty(key, false);
     return true;
   } catch (err) {
     console.warn(`apiSave(${key}) failed, data saved to localStorage only:`, err);
+    lsSetDirty(key, true);
     return false;
   }
 }
@@ -72,38 +135,64 @@ export { hashPassword };
 
 // ── Admin Auth (stays in localStorage — per-browser session) ─────────────────
 export function isAdmin() {
-  return localStorage.getItem(ADMIN_KEY) === 'true';
+  return localStorage.getItem(ADMIN_KEY) === 'true' && !!getApiToken();
+}
+
+function isLocalDevHost() {
+  try {
+    return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+  } catch {
+    return false;
+  }
+}
+
+async function validateAdminToken(token) {
+  const res = await fetch(`${API_BASE}?key=users`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error('Admin API is not available in this dev server.');
+  }
+  return res.ok;
 }
 
 export async function adminLogin(username, password) {
-  const user = localStorage.getItem(ADMIN_USER_KEY) || DEFAULT_USER;
-  const storedPass = localStorage.getItem(ADMIN_PASS_KEY);
+  // Admin credentials are validated against ADMIN_API_TOKEN on the server
+  // The client sends the token which is configured in Vercel env variables
   const inputHash = await hashPassword(password);
 
-  if (username === user) {
-    if (storedPass) {
-      if (inputHash === storedPass) {
+  // Try to authenticate with a protected endpoint. Public data endpoints cannot
+  // prove admin rights because they are readable without a token.
+  try {
+    const candidates = [password, inputHash];
+    for (const candidate of candidates) {
+      if (await validateAdminToken(candidate)) {
         localStorage.setItem(ADMIN_KEY, 'true');
-        return true;
-      }
-      if (password === storedPass) {
-        localStorage.setItem(ADMIN_PASS_KEY, inputHash);
-        localStorage.setItem(ADMIN_KEY, 'true');
-        return true;
-      }
-    } else {
-      if (password === DEFAULT_PASS) {
-        localStorage.setItem(ADMIN_PASS_KEY, inputHash);
-        localStorage.setItem(ADMIN_KEY, 'true');
+        localStorage.setItem(ADMIN_TOKEN_KEY, candidate);
+        localStorage.setItem(ADMIN_USER_KEY, username);
         return true;
       }
     }
+  } catch (err) {
+    if (isLocalDevHost()) {
+      // Plain Vite dev does not run /api serverless functions. Allow the local
+      // admin UI to open, but writes will stay marked as local-only until a real
+      // API token is used through Vercel/dev/prod.
+      localStorage.setItem(ADMIN_KEY, 'true');
+      localStorage.setItem(ADMIN_TOKEN_KEY, password);
+      localStorage.setItem(ADMIN_USER_KEY, username);
+      return true;
+    }
+    console.error('Admin login error:', err);
   }
+
   return false;
 }
 
 export function adminLogout() {
   localStorage.removeItem(ADMIN_KEY);
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
 }
 
 // ── Centralized Data (API-backed) ────────────────────────────────────────────
@@ -158,7 +247,7 @@ export async function savePending(data) {
   return apiSave('pending', data);
 }
 
-// Users
+// Users — now requires admin auth on the server side
 export async function loadUsers() {
   const data = await apiLoad('users');
   return Array.isArray(data) ? data : [];
@@ -169,5 +258,5 @@ export async function saveUsers(data) {
 }
 
 export function getAdminUsername() {
-  return localStorage.getItem(ADMIN_USER_KEY) || DEFAULT_USER;
+  return localStorage.getItem(ADMIN_USER_KEY) || 'admin';
 }

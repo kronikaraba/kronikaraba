@@ -25,39 +25,46 @@ export default function ArticlesPage({
       </header>
 
       <div className="articles-list">
-        {visibleArticles.map(article => (
-          <article id={article.id} className="article-row" key={article.id}>
-            <button type="button" className="article-thumb-wrap" onClick={() => onOpenArticle(article)}>
-              <img className="article-thumb" src={article.image} alt="" loading="lazy" />
-              <span className="article-tag">{article.tag}</span>
-            </button>
-            <div className="article-copy">
-              {adminMode && (
-                <div className="article-admin-actions">
-                  <button type="button" className="btn-cancel btn-sm article-edit-btn" onClick={() => onEditArticle(article)}>
-                    Düzenle
-                  </button>
-                  <button type="button" className="btn-cancel btn-sm article-delete-btn" onClick={() => onDeleteArticle(article.id)}>
-                    Sil
-                  </button>
-                </div>
-              )}
-              <div className="article-date">
-                <span className="article-date-icon" aria-hidden="true">◷</span>
-                {article.date}
-              </div>
-              <h2>
-                <button type="button" className="article-title-link" onClick={() => onOpenArticle(article)}>
-                  {article.title}
-                </button>
-              </h2>
-              <p>{article.excerpt}</p>
-              <button type="button" className="article-read-btn" onClick={() => onOpenArticle(article)}>
-                Devamını Oku »
+        {visibleArticles.map(article => {
+          const articleImage = String(article.image || '').trim();
+          return (
+            <article id={article.id} className="article-row" key={article.id}>
+              <button type="button" className="article-thumb-wrap" onClick={() => onOpenArticle(article)}>
+                {articleImage ? (
+                  <img className="article-thumb" src={articleImage} alt="" loading="lazy" />
+                ) : (
+                  <span className="article-thumb-placeholder" aria-hidden="true">KA</span>
+                )}
+                <span className="article-tag">{article.tag}</span>
               </button>
-            </div>
-          </article>
-        ))}
+              <div className="article-copy">
+                {adminMode && (
+                  <div className="article-admin-actions">
+                    <button type="button" className="btn-cancel btn-sm article-edit-btn" onClick={() => onEditArticle(article)}>
+                      Düzenle
+                    </button>
+                    <button type="button" className="btn-cancel btn-sm article-delete-btn" onClick={() => onDeleteArticle(article.id)}>
+                      Sil
+                    </button>
+                  </div>
+                )}
+                <div className="article-date">
+                  <span className="article-date-icon" aria-hidden="true">◷</span>
+                  {article.date}
+                </div>
+                <h2>
+                  <button type="button" className="article-title-link" onClick={() => onOpenArticle(article)}>
+                    {article.title}
+                  </button>
+                </h2>
+                <p>{article.excerpt}</p>
+                <button type="button" className="article-read-btn" onClick={() => onOpenArticle(article)}>
+                  Devamını Oku »
+                </button>
+              </div>
+            </article>
+          );
+        })}
       </div>
     </div>
   );
@@ -77,6 +84,7 @@ export function ArticleDetailPage({ article, adminMode = false, onBack, onEditAr
     .split(/\n{2,}|\r\n{2,}/)
     .map(p => p.trim())
     .filter(Boolean);
+  const articleImage = String(article.image || '').trim();
 
   return (
     <div className="page-view article-detail-page">
@@ -84,7 +92,11 @@ export function ArticleDetailPage({ article, adminMode = false, onBack, onEditAr
 
       <article className="article-detail">
         <div className="article-detail-hero">
-          <img src={article.image} alt="" />
+          {articleImage ? (
+            <img src={articleImage} alt="" />
+          ) : (
+            <span className="article-thumb-placeholder article-detail-placeholder" aria-hidden="true">KA</span>
+          )}
           <span className="article-tag article-detail-tag">{article.tag}</span>
         </div>
 

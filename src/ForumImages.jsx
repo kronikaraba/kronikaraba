@@ -34,7 +34,7 @@ export function ForumPostImages({ images }) {
             type="button"
             className="forum-image-thumb"
             onClick={() => setLightbox(img.url)}
-            aria-label={`Fotoğraf ${i + 1} — büyüt`}
+            aria-label={`Fotoğraf ${i + 1} - büyüt`}
           >
             <img src={img.url} alt={img.name || `Fotoğraf ${i + 1}`} loading="lazy" />
           </button>
@@ -56,29 +56,41 @@ export function ForumPostImages({ images }) {
   );
 }
 
-export function ForumImageAttach({ images, onChange, disabled }) {
+export function ForumImageAttach({
+  images = [],
+  onChange,
+  disabled,
+  onUploadingChange,
+  max = FORUM_IMAGE_LIMIT,
+  buttonLabel = '📷 Fotoğraf ekle',
+  hint,
+}) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const safeImages = Array.isArray(images) ? images : [];
 
   const pickFiles = async (e) => {
     const files = e.target.files;
     if (!files?.length) return;
     setError('');
     setUploading(true);
+    onUploadingChange?.(true);
     try {
-      const { uploaded, error: err } = await uploadImages(files, images.length);
-      if (uploaded.length) onChange([...images, ...uploaded]);
+      const { uploaded, error: err } = await uploadImages(files, safeImages.length, max);
+      if (uploaded.length) onChange([...safeImages, ...uploaded]);
       if (err) setError(err);
     } catch (ex) {
       setError(ex.message || 'Yükleme başarısız');
     } finally {
       setUploading(false);
+      onUploadingChange?.(false);
       if (inputRef.current) inputRef.current.value = '';
     }
   };
 
-  const remove = (id) => onChange(images.filter(img => img.id !== id));
+  const imageKey = (img, index) => img.id || img.url || `image-${index}`;
+  const remove = (targetKey) => onChange(safeImages.filter((img, index) => imageKey(img, index) !== targetKey));
 
   return (
     <div className="forum-image-attach">
@@ -89,28 +101,28 @@ export function ForumImageAttach({ images, onChange, disabled }) {
           accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
           multiple
           className="forum-image-input-hidden"
-          disabled={disabled || uploading || images.length >= FORUM_IMAGE_LIMIT}
+          disabled={disabled || uploading || safeImages.length >= max}
           onChange={pickFiles}
         />
         <button
           type="button"
           className="forum-image-pick-btn"
-          disabled={disabled || uploading || images.length >= FORUM_IMAGE_LIMIT}
+          disabled={disabled || uploading || safeImages.length >= max}
           onClick={() => inputRef.current?.click()}
         >
-          {uploading ? 'Yükleniyor…' : '📷 Fotoğraf ekle'}
+          {uploading ? 'Yükleniyor…' : buttonLabel}
         </button>
         <span className="forum-image-hint">
-          Bagaj, motor, arıza görseli · en fazla {FORUM_IMAGE_LIMIT} · max 5 MB
+          {hint || `Bagaj, motor, arıza görseli · en fazla ${max} · max 5 MB`}
         </span>
       </div>
       {error && <p className="forum-image-error">{error}</p>}
-      {images.length > 0 && (
+      {safeImages.length > 0 && (
         <div className="forum-image-previews">
-          {images.map(img => (
-            <div key={img.id} className="forum-image-preview">
+          {safeImages.map((img, index) => (
+            <div key={imageKey(img, index)} className="forum-image-preview">
               <img src={img.url} alt={img.name || ''} />
-              <button type="button" className="forum-image-remove" onClick={() => remove(img.id)} aria-label="Kaldır">×</button>
+              <button type="button" className="forum-image-remove" onClick={() => remove(imageKey(img, index))} aria-label="Kaldır">×</button>
             </div>
           ))}
         </div>

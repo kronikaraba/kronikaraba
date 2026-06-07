@@ -65,13 +65,23 @@ export async function uploadImageToCloud(file) {
   // Blob'u ArrayBuffer'a çevir — bazı tarayıcılarda raw Blob gönderimi kesintiye uğrayabiliyor
   const buffer = await blob.arrayBuffer();
 
+  // Include admin auth token if available
+  const adminToken = (() => {
+    try { return localStorage.getItem('ka_admin_token') || ''; } catch { return ''; }
+  })();
+
+  const headers = {
+    'Content-Type': 'image/jpeg',
+    'X-File-Name': encodeURIComponent(name),
+  };
+  if (adminToken) {
+    headers['Authorization'] = `Bearer ${adminToken}`;
+  }
+
   const res = await fetch('/api/upload', {
     method: 'POST',
     body: buffer,
-    headers: {
-      'Content-Type': 'image/jpeg',
-      'X-File-Name': encodeURIComponent(name),
-    },
+    headers,
   });
 
   const data = await res.json().catch(() => ({}));

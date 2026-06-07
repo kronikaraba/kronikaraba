@@ -227,6 +227,9 @@ export default function AdminHub({
                         {formatDateTimeMinute(p._submittedAt || p.suggestedAt, pid)}
                         {p.category ? ` · ${p.category}` : ''}
                       </p>
+                      {(p.images?.length > 0) && (
+                        <p className="admin-hub-meta">📷 {p.images.length} görsel</p>
+                      )}
                       {warnings.length > 0 && (
                         <p className="admin-hub-warn">Eksik: {warnings.join(', ')}</p>
                       )}

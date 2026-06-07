@@ -30,12 +30,35 @@ export function formatYearRange(yearMin, yearMax) {
   return String(a || b || '');
 }
 
+function normalizeFaultImages(images) {
+  const list = Array.isArray(images) ? images : (images ? [images] : []);
+
+  return list
+    .map((img, index) => {
+      if (typeof img === 'string') {
+        const url = img.trim();
+        return url ? { id: `fault-img-${index}`, url, name: '' } : null;
+      }
+
+      const url = String(img?.url || '').trim();
+      if (!url) return null;
+
+      return {
+        id: String(img.id || `fault-img-${index}`),
+        url,
+        name: String(img.name || ''),
+      };
+    })
+    .filter(Boolean);
+}
+
 /** Kayıt öncesi eksik alanları doldurur / meta alanları temizler */
 export function normalizeFault(f) {
   const faultText = (f.fault || f.description || '').trim();
   const { year, yearMin, yearMax } = parseYearRange(f.year, f.yearMin, f.yearMax);
   const costMin = Number(f.costMin) || 0;
   const costMax = Number(f.costMax) || 0;
+  const images = normalizeFaultImages(f.images ?? f.image);
 
   const cleaned = { ...f };
   const now = new Date().toISOString();
@@ -47,6 +70,8 @@ export function normalizeFault(f) {
   delete cleaned.suggestedBy;
   delete cleaned.suggestedAt;
   delete cleaned.description;
+  delete cleaned.image;
+  delete cleaned.images;
 
   return {
     ...cleaned,
@@ -71,6 +96,7 @@ export function normalizeFault(f) {
     motorType: f.motorType || 'Benzin',
     category: f.category || 'Motor',
     risk: f.risk || 'ORTA',
+    ...(images.length ? { images } : {}),
   };
 }
 

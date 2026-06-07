@@ -2,17 +2,23 @@ import { useState, useMemo } from 'react';
 import { loadCategories, loadMotorTypes } from './siteContent.js';
 import { savePending, loadPending } from './adminStorage.js';
 import { normalizeFault } from './faultUtils.js';
+import { ForumImageAttach } from './ForumImages.jsx';
 
 const EMPTY = {
   brand: '', model: '', fault: '', symptoms: '', category: 'Motor', motorType: 'Benzin',
-  year: '', risk: 'ORTA',
+  year: '', risk: 'ORTA', images: [],
 };
 
 export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubmit, onDirectPublish, categories, motorTypes }) {
   const isAdminUser = user?.isAdmin === true;
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState(() => ({ ...EMPTY }));
   const [submitted, setSubmitted] = useState(false);
-  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const set = (k, v) => {
+    setForm(p => ({ ...p, [k]: v }));
+    setSubmitError('');
+  };
   const catOptions = categories || [];
   const motorOptions = motorTypes || [];
   const brandOptions = useMemo(() => {
@@ -34,12 +40,21 @@ export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubm
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.brand.trim() || !form.model.trim() || !form.fault.trim()) return;
+    setSubmitError('');
+    if (!form.brand.trim() || !form.model.trim() || !form.fault.trim()) {
+      setSubmitError('Marka, model ve arıza açıklaması zorunludur.');
+      return;
+    }
+    if (uploadingImages) {
+      setSubmitError('Görsel yüklemesi tamamlanmadan gönderemezsiniz.');
+      return;
+    }
 
     const draft = normalizeFault({
       ...form,
       id: Date.now(),
       fault: form.fault.trim(),
+      images: form.images?.length ? form.images : undefined,
       year: form.year,
       costMin: 0,
       costMax: 0,
@@ -67,6 +82,7 @@ export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubm
       if (onSubmit) onSubmit();
     } catch (err) {
       console.error("Failed to save pending suggestion", err);
+      setSubmitError('Öneri kaydedilemedi. Lütfen tekrar deneyin.');
     }
   };
 
@@ -141,6 +157,16 @@ export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubm
                 style={{ resize: 'vertical' }}
               />
             </div>
+            <div className="form-group">
+              <label>Görseller</label>
+              <ForumImageAttach
+                images={form.images || []}
+                onChange={images => set('images', images)}
+                onUploadingChange={setUploadingImages}
+                buttonLabel="📷 Görsel ekle"
+                hint="Arıza, motor, uyarı ekranı veya parça fotoğrafı · en fazla 3 · max 5 MB"
+              />
+            </div>
             <div className="form-row">
               <div className="form-group">
                 <label>Yıl Aralığı</label>
@@ -167,10 +193,13 @@ export default function UserFaultSuggestModal({ user, allFaults, onClose, onSubm
                 </select>
               </div>
             </div>
+            {submitError && <p className="form-error">{submitError}</p>}
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn-cancel" onClick={onClose}>İptal</button>
-            <button type="submit" className="btn-submit">Gönder</button>
+            <button type="button" className="btn-cancel" onClick={onClose} disabled={uploadingImages}>İptal</button>
+            <button type="submit" className="btn-submit" disabled={uploadingImages}>
+              {uploadingImages ? 'Görseller yükleniyor...' : 'Gönder'}
+            </button>
           </div>
         </form>
       </div>

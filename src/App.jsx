@@ -16,8 +16,9 @@ import { MarkalarlPage, UzmanPage, MasrafPage } from './Pages.jsx';
 import ArticlesPage, { ArticleDetailPage } from './ArticlesPage.jsx';
 import ArticleEditModal from './ArticleEditModal.jsx';
 import LandingPage from './LandingPage.jsx';
+import AllModelsPage from './AllModelsPage.jsx';
 import UserFaultSuggestModal from './UserFaultSuggestModal.jsx';
-import { getFaultActivityInfo, formatRelativeTime, useNow } from './dateUtils.js';
+import { getDateTimeMs, getFaultActivityInfo, formatRelativeTime, useNow } from './dateUtils.js';
 import { popularModelTags } from './popularModels.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -30,6 +31,51 @@ const matchesModelQuery = (fault, query) => {
   const model = String(fault.model || '').toLowerCase();
   return model.includes(q) || `${brand} ${model}`.includes(q);
 };
+
+const EMPTY_MODEL_SPECS = {
+  motor: '', beygir: '', tork: '', sanziman: '',
+  yakit: '', hiz: '', agirlik: '', bagaj: '',
+};
+
+function cleanText(value) {
+  return String(value || '').trim();
+}
+
+function findStoredModelKey(modelMap, modelName) {
+  const target = cleanText(modelName).toLocaleLowerCase('tr-TR');
+  if (!target) return null;
+  return Object.keys(modelMap || {}).find(key => cleanText(key).toLocaleLowerCase('tr-TR') === target) || null;
+}
+
+function buildStoredModelRecord({ model, brand, source = {}, seedFault = {}, nowIso }) {
+  const modelName = cleanText(model);
+  const brandName = cleanText(source.brand || brand || seedFault.brand);
+  const title = [brandName, modelName].filter(Boolean).join(' ');
+  const faultTitle = cleanText(seedFault.fault || seedFault.description);
+  const checkTip = cleanText(seedFault.checkTip);
+  const kmDisplay = cleanText(seedFault.kmDisplay);
+  const specs = source.specs && typeof source.specs === 'object' && !Array.isArray(source.specs)
+    ? source.specs
+    : {};
+
+  return {
+    ...source,
+    brand: brandName,
+    heroTitle: cleanText(source.heroTitle) || title,
+    heroSubtitle: cleanText(source.heroSubtitle) || [cleanText(seedFault.year), cleanText(seedFault.motorType)].filter(Boolean).join(' - '),
+    blogIntro: cleanText(source.blogIntro) || (title ? `${title} için arıza kayıtları ve bakım notları bu sayfada toplanır.` : ''),
+    buyerAdvice: cleanText(source.buyerAdvice) || checkTip,
+    images: Array.isArray(source.images) ? source.images : [],
+    specs: { ...EMPTY_MODEL_SPECS, ...specs },
+    strengths: Array.isArray(source.strengths) ? source.strengths : [],
+    weaknesses: Array.isArray(source.weaknesses) ? source.weaknesses : (faultTitle ? [faultTitle] : []),
+    maintenanceTips: Array.isArray(source.maintenanceTips) ? source.maintenanceTips : (
+      checkTip ? [{ km: kmDisplay || 'Kontrol', tip: checkTip }] : []
+    ),
+    createdAt: source.createdAt || nowIso,
+    updatedAt: nowIso,
+  };
+}
 
 // ── Navbar ────────────────────────────────────────────────────────────────────
 function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, onLogout, onMenuToggle, onLogoClick, onNavAction, activeView, onSuggest }) {
@@ -58,6 +104,15 @@ function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, o
         </a>
         <a href="/markalar" className={`nav-link${activeView === 'markalar' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('brands'); }}>
           <Editable value={nb.navLinks.brands} path={['navbar', 'navLinks', 'brands']} />
+        </a>
+        <a href="/modeller" className={`nav-link${activeView === 'modeller' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('modeller'); }}>
+          <Editable value={nb.navLinks.models || 'Tüm Modeller'} path={['navbar', 'navLinks', 'models']} />
+        </a>
+        <a href="/uzman-gorusleri" className={`nav-link${activeView === 'uzman' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('uzman'); }}>
+          <Editable value={nb.navLinks.uzman || 'Uzman Görüşleri'} path={['navbar', 'navLinks', 'uzman']} />
+        </a>
+        <a href="/masraf" className={`nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
+          <Editable value={nb.navLinks.masraf || 'Masraf Rehberi'} path={['navbar', 'navLinks', 'masraf']} />
         </a>
         <a href="/makaleler" className={`nav-link${activeView === 'articles' || activeView === 'articleDetail' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('articles'); }}>
           <Editable value={nb.navLinks.articles || 'Makaleler'} path={['navbar', 'navLinks', 'articles']} />
@@ -124,24 +179,36 @@ function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, o
 // ── UserMenu ─────────────────────────────────────────────────────────────────
 function UserMenu({ user, onLogout }) {
   const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
   const { authed, editMode, setEditMode, pendingCount, openHub, adminCallbacks } = useLiveEdit();
   const isAdminUser = authed || user?.isAdmin === true;
-  const runAdminAction = (action) => {
+  const runAdminAction = (action, { close = true } = {}) => {
     action();
-    setOpen(false);
+    if (close) setOpen(false);
   };
 
   const username = user?.username || 'Kullanıcı';
   const initial = username ? username[0].toUpperCase() : '?';
 
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsideClick = (event) => {
+      if (!menuRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+  }, [open]);
+
   return (
-    <div className="user-menu">
+    <div className="user-menu" ref={menuRef}>
       <button className="user-avatar-btn" onClick={() => setOpen(o => !o)}>
         <div className="avatar-circle">{initial}</div>
         <span>{username}</span>
       </button>
       {open && (
-        <div className="user-dropdown" onClick={() => setOpen(false)}>
+        <div className="user-dropdown">
           <div className="user-dropdown-item" style={{ fontWeight: 700, color: 'var(--gray-900)', cursor: 'default' }}>
             👤 {username}
           </div>
@@ -155,7 +222,7 @@ function UserMenu({ user, onLogout }) {
               </div>
               <div className="user-dropdown-admin-grid">
                 <button type="button" onClick={() => runAdminAction(() => openHub('pending'))}>Yönetim</button>
-                <button type="button" onClick={() => runAdminAction(() => setEditMode(m => !m))}>
+                <button type="button" onClick={() => runAdminAction(() => setEditMode(m => !m), { close: false })}>
                   {editMode ? 'Önizleme' : 'Düzenle'}
                 </button>
               </div>
@@ -265,6 +332,15 @@ function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpen
           </a>
           <a href="/markalar" className={`sidebar-nav-link${activeView === 'markalar' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('brands'); }}>
             <span>🏢</span> {nb.navLinks.brands}
+          </a>
+          <a href="/modeller" className={`sidebar-nav-link${activeView === 'modeller' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('modeller'); }}>
+            <span>🚗</span> {nb.navLinks.models || 'Tüm Modeller'}
+          </a>
+          <a href="/uzman-gorusleri" className={`sidebar-nav-link${activeView === 'uzman' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('uzman'); }}>
+            <span>🔍</span> {nb.navLinks.uzman || 'Uzman Görüşleri'}
+          </a>
+          <a href="/masraf" className={`sidebar-nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
+            <span>💰</span> {nb.navLinks.masraf || 'Masraf Rehberi'}
           </a>
           <a href="/makaleler" className={`sidebar-nav-link${activeView === 'articles' || activeView === 'articleDetail' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('articles'); }}>
             <span>📰</span> {nb.navLinks.articles || 'Makaleler'}
@@ -490,6 +566,7 @@ function FaultCard({ fault, user, onAuthRequest, onModelClick, onEdit, onDelete,
   const showAdmin = adminMode && editMode;
   const catIcon = CAT_ICONS[fault.category] || '🔧';
   const commentCount = commentCountProp != null ? commentCountProp : getCommentCount(fault.id);
+  const imageCount = Array.isArray(fault.images) ? fault.images.length : 0;
   const faultActivity = useMemo(() => {
     if (!activity) return getFaultActivityInfo(fault, [], now);
     // Keep the cached timestamp (which includes forum posts) but recompute
@@ -550,6 +627,17 @@ function FaultCard({ fault, user, onAuthRequest, onModelClick, onEdit, onDelete,
             </svg>
             <span className="thread-metric-val">{commentCount}</span>
           </div>
+
+          {imageCount > 0 && (
+            <div className="thread-metric-item" title={`${imageCount} Görsel`}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              <span className="thread-metric-val">{imageCount}</span>
+            </div>
+          )}
 
           <div className="thread-metric-item" title={`${fault.reportCount} Kullanıcı Doğruladı`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -619,6 +707,7 @@ function ActivePills({ filters, onFilters }) {
 
 // ── Sort ──────────────────────────────────────────────────────────────────────
 const SORT_OPTIONS = [
+  { value: 'newest-desc', label: 'En Yeni' },
   { value: 'activity-desc', label: 'Son Güncellenen' },
   { value: 'reports-desc', label: 'En Çok Doğrulanan' },
   { value: 'cost-desc', label: 'En Yüksek Masraf' },
@@ -633,6 +722,11 @@ function sortData(data, sort, activityMap) {
     case 'activity-desc': return d.sort((a, b) => {
       const aTime = activityMap?.[a.id]?.timestamp || 0;
       const bTime = activityMap?.[b.id]?.timestamp || 0;
+      return bTime - aTime || b.reportCount - a.reportCount;
+    });
+    case 'newest-desc': return d.sort((a, b) => {
+      const aTime = getDateTimeMs(a.createdAt || a.publishedAt || a.suggestedAt || a.updatedAt, a.id);
+      const bTime = getDateTimeMs(b.createdAt || b.publishedAt || b.suggestedAt || b.updatedAt, b.id);
       return bTime - aTime || b.reportCount - a.reportCount;
     });
     case 'reports-desc': return d.sort((a, b) => b.reportCount - a.reportCount);
@@ -678,6 +772,7 @@ const EMPTY_FILTERS = {
 const VIEW_PATHS = {
   home: '/',
   markalar: '/markalar',
+  modeller: '/modeller',
   uzman: '/uzman-gorusleri',
   masraf: '/masraf',
   articles: '/makaleler',
@@ -722,6 +817,7 @@ function routeStateFromPath(faults = [], models = {}) {
   const pathname = decodeURIComponent(window.location.pathname || '/').replace(/\/+$/, '') || '/';
 
   if (pathname === '/markalar') return { activeView: 'markalar', selectedModel: null, selectedFaultId: null, forceExplorer: false };
+  if (pathname === '/modeller') return { activeView: 'modeller', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/uzman-gorusleri') return { activeView: 'uzman', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/masraf') return { activeView: 'masraf', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/makaleler') return { activeView: 'articles', selectedModel: null, selectedFaultId: null, forceExplorer: false };
@@ -841,8 +937,9 @@ function AppContent() {
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(20);
   const PAGE_SIZE = 20;
-  const adminMode = authed && editMode;
-  const articleAdminMode = authed || user?.isAdmin === true;
+  const canUseAdminTools = authed || user?.isAdmin === true;
+  const adminMode = canUseAdminTools && editMode;
+  const articleAdminMode = canUseAdminTools;
 
   // ── Browser history helpers ────────────────────────────────────────────────
   const skipPushRef = useRef(false); // flag to skip pushState during popstate handling
@@ -958,6 +1055,7 @@ function AppContent() {
     const titles = {
       home: 'KronikArıza — Araç Kronik Arıza Veritabanı',
       markalar: 'Markalar | KronikAraba',
+      modeller: 'Tüm Modeller | KronikAraba',
       uzman: 'Uzman Görüşleri | KronikAraba',
       masraf: 'Masraf Hesaplama | KronikAraba',
       articles: 'Makaleler | KronikAraba',
@@ -969,9 +1067,17 @@ function AppContent() {
   useEffect(() => {
     registerAdminCallbacks({
       onNewFault: () => setEditFault('new'),
-      onNewModel: () => setEditModel({ key: null, data: null }),
+      onNewModel: () => {
+        setSelectedFault(null);
+        setSelectedModel(null);
+        setSelectedArticleId(null);
+        setActiveView('modeller');
+        setForceExplorer(false);
+        setEditModel({ key: null, data: null });
+        pushNav({ activeView: 'modeller', selectedModel: null, selectedFaultId: null, selectedArticleId: null, forceExplorer: false });
+      },
     });
-  }, [registerAdminCallbacks]);
+  }, [registerAdminCallbacks, pushNav]);
 
   useEffect(() => {
     const checkHash = () => {
@@ -1004,6 +1110,9 @@ function AppContent() {
     } else if (action === 'uzman') {
       setActiveView('uzman');
       pushNav({ activeView: 'uzman', selectedModel: null, selectedFaultId: null, selectedArticleId: null });
+    } else if (action === 'modeller') {
+      setActiveView('modeller');
+      pushNav({ activeView: 'modeller', selectedModel: null, selectedFaultId: null, selectedArticleId: null });
     } else if (action === 'masraf') {
       setActiveView('masraf');
       pushNav({ activeView: 'masraf', selectedModel: null, selectedFaultId: null, selectedArticleId: null });
@@ -1021,6 +1130,36 @@ function AppContent() {
     setData(next);
     return saveAdminFaults(next);
   }, []);
+
+  const persistModels = async (next) => {
+    setModels(next);
+    return saveAdminModels(next);
+  };
+
+  const ensureModelRecordForFault = async (fault) => {
+    const modelName = cleanText(fault?.model);
+    const brandName = cleanText(fault?.brand);
+    if (!modelName || !brandName) {
+      return { added: false, savedRemotely: true };
+    }
+
+    if (findStoredModelKey(models, modelName)) {
+      return { added: false, savedRemotely: true };
+    }
+
+    const nowIso = new Date().toISOString();
+    const next = {
+      ...models,
+      [modelName]: buildStoredModelRecord({
+        model: modelName,
+        brand: brandName,
+        seedFault: fault,
+        nowIso,
+      }),
+    };
+    const savedRemotely = await persistModels(next);
+    return { added: true, savedRemotely };
+  };
 
   const handleLogin = (u) => { setUser(u); setToast(`Hoş geldiniz, ${u.username}!`); };
   const handleLogout = () => {
@@ -1121,7 +1260,9 @@ function AppContent() {
     const next = idx >= 0
       ? data.map((f, i) => (String(f.id) === String(normalized.id) ? normalized : f))
       : [normalized, ...data];
-    const savedRemotely = await persistFaults(next);
+    const faultSavedRemotely = await persistFaults(next);
+    const modelSave = await ensureModelRecordForFault(normalized);
+    const savedRemotely = faultSavedRemotely && modelSave.savedRemotely;
     if (pendingId) {
       try {
         const pendingList = await loadPending();
@@ -1136,11 +1277,18 @@ function AppContent() {
       setSelectedFault(normalized);
     }
     if (savedRemotely) {
-      setToast(pendingId ? 'Öneri yayınlandı!' : 'Arıza kaydedildi!');
+      setToast(pendingId
+        ? (modelSave.added ? 'Öneri yayınlandı ve yeni model kaydedildi!' : 'Öneri yayınlandı!')
+        : (modelSave.added ? 'Arıza ve yeni model kaydedildi!' : 'Arıza kaydedildi!')
+      );
     } else {
       setToast(pendingId
-        ? 'Öneri bu tarayıcıda yayınlandı; sunucuya yazılamadı.'
-        : 'Arıza bu tarayıcıda kaydedildi; sunucuya yazılamadı.'
+        ? (modelSave.added
+          ? 'Öneri ve yeni model bu tarayıcıda yayınlandı; sunucuya yazılamadı.'
+          : 'Öneri bu tarayıcıda yayınlandı; sunucuya yazılamadı.')
+        : (modelSave.added
+          ? 'Arıza ve yeni model bu tarayıcıda kaydedildi; sunucuya yazılamadı.'
+          : 'Arıza bu tarayıcıda kaydedildi; sunucuya yazılamadı.')
       );
     }
     return savedRemotely;
@@ -1159,17 +1307,63 @@ function AppContent() {
     const normalized = normalizeFault(fault);
     const exists = data.some(f => String(f.id) === String(normalized.id));
     await persistFaults(exists ? data.map(f => (String(f.id) === String(normalized.id) ? normalized : f)) : [normalized, ...data]);
+    await ensureModelRecordForFault(normalized);
     refreshPending();
   };
 
-  const handleSaveModel = (key, modelData) => {
-    setModels(prev => {
-      const next = { ...prev, [key]: modelData };
-      saveAdminModels(next);
-      return next;
-    });
+  const handleSaveModel = async (key, modelData) => {
+    const nowIso = new Date().toISOString();
+    const modelKey = cleanText(key);
+    if (!modelKey) return;
+    const storedKey = findStoredModelKey(models, modelKey) || modelKey;
+    const existingModel = models[storedKey] || {};
+    const source = {
+      ...existingModel,
+      ...modelData,
+      createdAt: modelData.createdAt || existingModel.createdAt,
+    };
+    const next = {
+      ...models,
+      [storedKey]: buildStoredModelRecord({
+        model: storedKey,
+        brand: modelData.brand,
+        source,
+        nowIso,
+      }),
+    };
+    const savedRemotely = await persistModels(next);
     setEditModel(null);
-    setToast('Model makalesi kaydedildi!');
+    setSelectedFault(null);
+    setSelectedModel(null);
+    setSelectedArticleId(null);
+    setActiveView('modeller');
+    setForceExplorer(false);
+    pushNav({ activeView: 'modeller', selectedModel: null, selectedFaultId: null, selectedArticleId: null, forceExplorer: false });
+    setToast(savedRemotely
+      ? 'Model /modeller sayfasına kaydedildi!'
+      : 'Model bu tarayıcıda /modeller sayfasına kaydedildi; sunucuya yazılamadı.'
+    );
+  };
+
+  const handleDeleteModel = async (key) => {
+    if (!key || !models[key]) return;
+    if (!confirm('Bu model sayfasını silmek istediğinize emin misiniz?')) return;
+    const next = { ...models };
+    delete next[key];
+    setModels(next);
+    const savedRemotely = await saveAdminModels(next);
+    if (selectedModel === key) {
+      setSelectedModel(null);
+    }
+    setSelectedFault(null);
+    setSelectedArticleId(null);
+    setActiveView('modeller');
+    setForceExplorer(false);
+    pushNav({ activeView: 'modeller', selectedModel: null, selectedFaultId: null, selectedArticleId: null, forceExplorer: false });
+    setToast(savedRemotely
+      ? 'Model sayfası silindi.'
+      : 'Model sayfası bu tarayıcıda silindi; sunucuya yazılamadı.'
+    );
   };
 
   const handleSaveArticle = async (article) => {
@@ -1288,6 +1482,10 @@ function AppContent() {
               onBack={() => { setSelectedModel(null); pushNav({ selectedModel: null }); }}
               onEditModel={(key, data) => setEditModel({ key, data })}
               onCreateModel={() => setEditModel({ key: selectedModel, data: null })}
+              onDeleteModel={handleDeleteModel}
+              onAddFault={(brand, model) => {
+                setEditFault({ brand: brand || '', model: model || '', _prefilled: true });
+              }}
               user={user}
               onAuthRequest={() => openAuth('login')}
               onForumChange={handleForumChange}
@@ -1306,6 +1504,23 @@ function AppContent() {
                 setFilters(newFilters);
                 pushNav({ activeView: 'home', filters: newFilters });
               }}
+            />
+          </main>
+        </div>
+      ) : activeView === 'modeller' ? (
+        <div className="layout layout-detail">
+          <main className="main main-detail" style={{ maxWidth: 1100 }}>
+            <AllModelsPage
+              data={data}
+              models={models}
+              content={content}
+              adminMode={adminMode}
+              onModelClick={(m) => { setSelectedModel(m); pushNav({ selectedModel: m }); }}
+              onAddFault={(brand, model) => {
+                setEditFault({ brand: brand || '', model: model || '', _prefilled: true });
+              }}
+              onNewModel={() => setEditModel({ key: null, data: null })}
+              onDeleteModel={handleDeleteModel}
             />
           </main>
         </div>
@@ -1477,8 +1692,9 @@ function AppContent() {
 
       {editFault && (
         <FaultEditModal
-          fault={editFault === 'new' ? null : editFault}
+          fault={editFault === 'new' ? null : (editFault._prefilled ? { brand: editFault.brand, model: editFault.model } : editFault)}
           allFaults={data}
+          models={models}
           onSave={handleSaveFault}
           onClose={() => setEditFault(null)}
           categories={categories}
