@@ -323,4 +323,4 @@ export const faultData = [...baseFaultData, ...popularFaultData2026];
 export const brands = [...new Set(faultData.map(f => f.brand))].sort();
 export const categories = [...new Set(faultData.map(f => f.category))].sort();
 export const motorTypes = [...new Set(faultData.map(f => f.motorType))].sort();
-export const riskLevels = ["YÜKSEK", "ORTA", "DÜŞÜK"];
+export const riskLevels = ["FECİ", "YÜKSEK", "ORTA", "DÜŞÜK"];

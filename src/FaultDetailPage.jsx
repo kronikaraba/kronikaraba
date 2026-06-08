@@ -6,7 +6,16 @@ import { ForumPostImages } from './ForumImages.jsx';
 import { updateMeta, injectJsonLd, removeJsonLd, buildFaultJsonLd } from './seoUtils.js';
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
-const fmtCost = (min, max) => `₺${fmt(min)} – ₺${fmt(max)}`;
+const fmtCost = (min, max) => {
+  const minN = Number(min || 0);
+  const maxN = Number(max || 0);
+  if (minN === 0 && maxN === 0) return 'Belirtilmemiş';
+  return `₺${fmt(minN)} – ₺${fmt(maxN)}`;
+};
+const fmtKm = (km) => {
+  if (!km || km === '0 km' || km === '0' || km.trim() === '') return '–';
+  return km;
+};
 
 // Category icons
 const CAT_ICONS = {
@@ -149,7 +158,7 @@ export default function FaultDetailPage({ fault, activity, user, onAuthRequest, 
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </div>
           <span className="fd-info-label">Görülme KM</span>
-          <p className="fd-info-value fd-info-km">{fault.kmDisplay}</p>
+          <p className="fd-info-value fd-info-km">{fmtKm(fault.kmDisplay)}</p>
         </div>
         <div className="fd-info-card">
           <div className="fd-info-icon">

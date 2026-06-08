@@ -10,6 +10,50 @@ const BRAND_COLORS = {
   'Peugeot': '#003087', 'Dacia': '#1F2F5A',
 };
 
+// Gerçek marka kısaltmaları (VO, RE yerine VW, REN vb.)
+const BRAND_ABBR = {
+  'Volkswagen': 'VW',
+  'Mercedes': 'MB',
+  'BMW': 'BMW',
+  'Audi': 'AUDI',
+  'Renault': 'REN',
+  'Ford': 'FORD',
+  'Toyota': 'TOY',
+  'Fiat': 'FIAT',
+  'Hyundai': 'HYN',
+  'Peugeot': 'PEU',
+  'Dacia': 'DAC',
+  'Opel': 'OPEL',
+  'Citroen': 'CIT',
+  'Honda': 'HON',
+  'Nissan': 'NIS',
+  'Kia': 'KIA',
+  'Volvo': 'VOL',
+  'Skoda': 'ŠKOD',
+  'MINI': 'MINI',
+  'Mazda': 'MAZ',
+  'BYD': 'BYD',
+  'Tesla': 'TES',
+  'Togg': 'TOGG',
+  'MG': 'MG',
+  'Subaru': 'SUB',
+  'Suzuki': 'SUZ',
+  'Mitsubishi': 'MIT',
+  'Chery': 'CHE',
+  'Alfa Romeo': 'AR',
+  'Jeep': 'JEEP',
+};
+
+const getBrandAbbr = (brand) =>
+  BRAND_ABBR[brand] || brand.slice(0, 3).toUpperCase();
+
+const fmtCostSafe = (min, max) => {
+  const minN = Number(min || 0);
+  const maxN = Number(max || 0);
+  if (minN === 0 && maxN === 0) return 'Belirtilmemiş';
+  return `₺${fmt(minN)} – ₺${fmt(maxN)}`;
+};
+
 // ── MARKALAR ─────────────────────────────────────────────────────────────────
 export function MarkalarlPage({ data, content, onBrandSelect }) {
   const m = content?.markalar || {};
@@ -20,7 +64,7 @@ export function MarkalarlPage({ data, content, onBrandSelect }) {
       s[f.brand].count++;
       s[f.brand].reports += f.reportCount;
       s[f.brand].totalCost += f.avgCost;
-      if (f.risk === 'YÜKSEK') s[f.brand].riskHigh++;
+      if (f.risk === 'YÜKSEK' || f.risk === 'FECİ') s[f.brand].riskHigh++;
     });
     Object.keys(s).forEach(b => { s[b].avgCost = Math.round(s[b].totalCost / s[b].count); });
     return s;
@@ -52,7 +96,7 @@ export function MarkalarlPage({ data, content, onBrandSelect }) {
           return (
             <div key={brand} className="brand-card" onClick={() => onBrandSelect(brand)}>
               <div className="brand-card-logo" style={{ background: color }}>
-                {brand.slice(0, 2).toUpperCase()}
+                {getBrandAbbr(brand)}
               </div>
               <div className="brand-card-body">
                 <h3 className="brand-card-name">{brand}</h3>
@@ -116,7 +160,7 @@ export function UzmanPage({ data, content, onModelClick }) {
               <div className="uzman-meta">
                 <span className="uzman-meta-item"><span className="meta-lbl">Kategori:</span> {fault.category}</span>
                 <span className="uzman-meta-item"><span className="meta-lbl">Kilometre:</span> {fault.kmDisplay}</span>
-                <span className="uzman-meta-item"><span className="meta-lbl">Masraf:</span> ₺{fmt(fault.costMin)} – ₺{fmt(fault.costMax)}</span>
+                <span className="uzman-meta-item"><span className="meta-lbl">Masraf:</span> {fmtCostSafe(fault.costMin, fault.costMax)}</span>
               </div>
             </div>
             <div className="uzman-reports">

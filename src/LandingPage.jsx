@@ -23,15 +23,25 @@ export default function LandingPage({
   const totalReports = useMemo(() => data.reduce((s, f) => s + f.reportCount, 0), [data]);
   const faultCount = data.length;
 
+  const fmt = (n) => Number(n).toLocaleString('tr-TR');
+  const fmtCostLP = (cost) => {
+    const n = Number(cost || 0);
+    return n > 0 ? `₺${fmt(n)}` : '–';
+  };
+  const fmtKmLP = (km) => {
+    if (!km || km === '0 km' || km === '0' || km.trim() === '') return '–';
+    return km;
+  };
+
   const popularBrands = [
-    { name: 'Volkswagen', abbr: 'VW',   color: '#1E3A8A' },
-    { name: 'BMW',        abbr: 'BMW',  color: '#0052CC' },
-    { name: 'Mercedes',   abbr: 'MB',   color: '#1A1A1A' },
-    { name: 'Audi',       abbr: 'AUDI', color: '#C41E3A' },
-    { name: 'Renault',    abbr: 'REN',  color: '#EFCB00', dark: true },
-    { name: 'Ford',       abbr: 'FORD', color: '#003476' },
-    { name: 'Toyota',     abbr: 'TOY',  color: '#EB0A1E' },
-    { name: 'Fiat',       abbr: 'FIAT', color: '#8B0000' },
+    { name: 'Volkswagen', abbr: 'VW',   color: '#1E3A8A', gradient: 'linear-gradient(135deg, #1E3A8A, #3B82F6)' },
+    { name: 'BMW',        abbr: 'BMW',  color: '#0052CC', gradient: 'linear-gradient(135deg, #002F6C, #0052CC, #8ab4f8)' },
+    { name: 'Mercedes',   abbr: 'MB',   color: '#1A1A1A', gradient: 'linear-gradient(135deg, #1A1A1A, #434343)' },
+    { name: 'Audi',       abbr: 'AUDI', color: '#C41E3A', gradient: 'linear-gradient(135deg, #8B0000, #C41E3A, #ff4d4d)' },
+    { name: 'Renault',    abbr: 'REN',  color: '#EFCB00', gradient: 'linear-gradient(135deg, #FFB300, #EFCB00)', dark: true },
+    { name: 'Ford',       abbr: 'FORD', color: '#003476', gradient: 'linear-gradient(135deg, #001A3F, #003476)' },
+    { name: 'Toyota',     abbr: 'TOY',  color: '#EB0A1E', gradient: 'linear-gradient(135deg, #8B0000, #EB0A1E)' },
+    { name: 'Fiat',       abbr: 'FIAT', color: '#8B0000', gradient: 'linear-gradient(135deg, #5A0000, #9E1B1B)' },
   ];
 
   const brandStats = useMemo(() => {
@@ -54,8 +64,6 @@ export default function LandingPage({
       .slice(0, 8),
   [data, activityMap]);
 
-  const fmt = (n) => Number(n).toLocaleString('tr-TR');
-
   const submitSearch = (e) => {
     e?.preventDefault();
     const q = searchVal.trim();
@@ -67,12 +75,13 @@ export default function LandingPage({
   };
 
   const RISK_COLOR = {
+    'FECİ':   { bg: 'var(--feci-bg, rgba(190, 18, 60, 0.12))', text: 'var(--feci-text, #9f1239)', dot: 'var(--feci, #be123c)' },
     'YÜKSEK': { bg: 'var(--red-bg)', text: 'var(--red-text)', dot: 'var(--red)' },
     'ORTA':   { bg: 'var(--orange-bg)', text: 'var(--orange-text)', dot: 'var(--orange)' },
     'DÜŞÜK':  { bg: 'var(--green-bg)', text: 'var(--green-text)', dot: 'var(--green)' },
   };
 
-  const CAT_ICON = { Motor:'🔧', Şanzıman:'⚙️', Egzoz:'💨', Süspansiyon:'🔩', Elektrik:'⚡', Fren:'🛑' };
+  const CAT_ICON = { Motor:'🔧', Şanzıman:'⚙️', Egzoz:'💨', Süspansiyon:'🔩', Elektrik:'⚡', Fren:'🛑', Multimedya:'📺', Soğutma:'🌡️', Elektronik:'💡' };
 
   return (
     <div className="lp-root">
@@ -176,10 +185,12 @@ export default function LandingPage({
                 const rc = RISK_COLOR[f.risk] || RISK_COLOR['ORTA'];
                 const icon = CAT_ICON[f.category] || '🔧';
                 const activity = activityMap[f.id];
+                const brandObj = popularBrands.find(b => b.name.toLowerCase() === f.brand.toLowerCase()) || { color: '#64748b' };
                 return (
                   <div
                     key={f.id}
                     className="lp-thread-row"
+                    style={{ borderLeft: `4px solid ${brandObj.color}` }}
                     onClick={() => onFaultClick && onFaultClick(f)}
                   >
                     {/* Category icon */}
@@ -230,7 +241,7 @@ export default function LandingPage({
                           {fmt(f.reportCount)}
                         </span>
                         <span className="lp-tr-metric" title="Masraf">
-                          ₺{fmt(f.avgCost)}
+                          {fmtCostLP(f.avgCost)}
                         </span>
                       </div>
                     </div>
@@ -304,7 +315,7 @@ export default function LandingPage({
                     className="lp-brand-btn"
                     onClick={() => onBrandSelect(b.name)}
                   >
-                    <div className="lp-brand-circle" style={{ background: b.color, color: b.dark ? '#111' : '#fff' }}>
+                    <div className="lp-brand-circle" style={{ background: b.gradient || b.color, color: b.dark ? '#111' : '#fff' }}>
                       {b.abbr}
                     </div>
                     <span className="lp-brand-name">{b.name}</span>
