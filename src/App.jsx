@@ -9,6 +9,9 @@ import FaultDetailPage from './FaultDetailPage.jsx';
 import { loadAdminFaults, saveAdminFaults, loadAdminModels, saveAdminModels, loadPending, savePending, loadForum, saveForum, loadArticles, saveArticles } from './adminStorage.js';
 import { normalizeFault, getPendingId } from './faultUtils.js';
 import { LiveEditProvider, Editable, useLiveEdit } from './liveEdit.jsx';
+import ScrollToTop from './ScrollToTop.jsx';
+import Footer from './Footer.jsx';
+import ProfilePage from './ProfilePage.jsx';
 import FaultEditModal from './faultEditModal.jsx';
 import ModelEditModal from './modelEditModal.jsx';
 import AdminHub from './adminHub.jsx';
@@ -160,7 +163,7 @@ function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, o
         )}
         <div className="navbar-auth">
           {user ? (
-            <UserMenu user={user} onLogout={onLogout} />
+            <UserMenu user={user} onLogout={onLogout} onProfile={() => onNavAction('profile')} />
           ) : editMode ? (
             <>
               <span className="btn-login"><Editable value={nb.loginText} path={['navbar', 'loginText']} /></span>
@@ -200,7 +203,7 @@ function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, o
 }
 
 // ── UserMenu ─────────────────────────────────────────────────────────────────
-function UserMenu({ user, onLogout }) {
+function UserMenu({ user, onLogout, onProfile }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
   const { authed, editMode, setEditMode, pendingCount, openHub, adminCallbacks } = useLiveEdit();
@@ -236,6 +239,7 @@ function UserMenu({ user, onLogout }) {
             👤 {username}
           </div>
           <div className="user-dropdown-item" style={{ fontSize: 11, color: 'var(--gray-400)', cursor: 'default' }}>{user?.email || ''}</div>
+          <button type="button" className="user-dropdown-item" onClick={() => runAdminAction(() => onProfile())}>👤 Profilim</button>
           {isAdminUser && (
             <>
               <div className="user-dropdown-sep" />
@@ -437,7 +441,7 @@ function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpen
 }
 
 // ── Advanced Filter Modal ────────────────────────────────────────────────────────
-function AdvancedFilterModal({ isOpen, onClose, filters, onFilters }) {
+function AdvancedFilterModal({ isOpen, onClose, filters, onFilters, allData = [], categories = [], motorTypes = [] }) {
   const [localFilters, setLocalFilters] = useState({ ...filters });
 
   useEffect(() => {
@@ -445,6 +449,15 @@ function AdvancedFilterModal({ isOpen, onClose, filters, onFilters }) {
       setLocalFilters({ ...filters });
     }
   }, [isOpen, filters]);
+
+  const uniqueBrands = useMemo(() => {
+    return [...new Set(allData.map(f => f.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'));
+  }, [allData]);
+
+  const uniqueModels = useMemo(() => {
+    if (!localFilters.brand) return [];
+    return [...new Set(allData.filter(f => f.brand === localFilters.brand).map(f => f.model).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'));
+  }, [allData, localFilters.brand]);
 
   if (!isOpen) return null;
 
@@ -456,13 +469,17 @@ function AdvancedFilterModal({ isOpen, onClose, filters, onFilters }) {
   const handleClear = () => {
     const cleared = {
       ...localFilters,
+      brand: '',
       model: '',
       yearMin: '',
       yearMax: '',
       kmMin: '',
       costMin: '',
       costMax: '',
-      minReports: ''
+      minReports: '',
+      motorType: '',
+      category: '',
+      risk: ''
     };
     setLocalFilters(cleared);
     onFilters(cleared);
@@ -482,20 +499,66 @@ function AdvancedFilterModal({ isOpen, onClose, filters, onFilters }) {
           <button className="filter-modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="filter-modal-body">
-          {/* 1. Model adı arama */}
-          <div className="filter-group">
-            <label className="filter-label">Model Adı</label>
-            <input
-              className="filter-input-text"
-              type="text"
-              placeholder="örn. Passat, Golf, 320i"
-              value={localFilters.model || ''}
-              onChange={e => setLocalFilters(p => ({ ...p, model: e.target.value }))}
-            />
+          {/* Brand & Model Dependent dropdowns */}
+          <div className="filter-row-inputs" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="filter-group">
+              <label className="filter-label">Marka</label>
+              <select
+                className="filter-input-select"
+                value={localFilters.brand || ''}
+                onChange={e => {
+                  const b = e.target.value;
+                  setLocalFilters(p => ({ ...p, brand: b, model: '' }));
+                }}
+              >
+                <option value="">Tüm Markalar</option>
+                {uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            
+            <div className="filter-group">
+              <label className="filter-label">Model</label>
+              <select
+                className="filter-input-select"
+                value={localFilters.model || ''}
+                onChange={e => setLocalFilters(p => ({ ...p, model: e.target.value }))}
+                disabled={!localFilters.brand}
+              >
+                <option value="">{localFilters.brand ? 'Tüm Modeller' : 'Önce Marka Seçin'}</option>
+                {uniqueModels.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
           </div>
 
-          {/* 2. Model Yılı Aralığı */}
-          <div className="filter-group">
+          {/* Motor Type & Category */}
+          <div className="filter-row-inputs" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+            <div className="filter-group">
+              <label className="filter-label">Motor Tipi</label>
+              <select
+                className="filter-input-select"
+                value={localFilters.motorType || ''}
+                onChange={e => setLocalFilters(p => ({ ...p, motorType: e.target.value }))}
+              >
+                <option value="">Tümü</option>
+                {motorTypes.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label className="filter-label">Kategori</label>
+              <select
+                className="filter-input-select"
+                value={localFilters.category || ''}
+                onChange={e => setLocalFilters(p => ({ ...p, category: e.target.value }))}
+              >
+                <option value="">Tümü</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Model Yılı Aralığı */}
+          <div className="filter-group" style={{ marginTop: 12 }}>
             <label className="filter-label">Model Yılı Aralığı</label>
             <div className="filter-row-inputs">
               <input
@@ -516,8 +579,8 @@ function AdvancedFilterModal({ isOpen, onClose, filters, onFilters }) {
             </div>
           </div>
 
-          {/* 3. Kilometre Aralığı */}
-          <div className="filter-group">
+          {/* Kilometre Aralığı */}
+          <div className="filter-group" style={{ marginTop: 12 }}>
             <label className="filter-label">Görülme Kilometresi (En Az)</label>
             <input
               className="filter-input-text"
@@ -528,8 +591,8 @@ function AdvancedFilterModal({ isOpen, onClose, filters, onFilters }) {
             />
           </div>
 
-          {/* 4. Tahmini Masraf Aralığı */}
-          <div className="filter-group">
+          {/* Tahmini Masraf Aralığı */}
+          <div className="filter-group" style={{ marginTop: 12 }}>
             <label className="filter-label">Tahmini Masraf Aralığı (₺)</label>
             <div className="filter-row-inputs">
               <input
@@ -550,8 +613,8 @@ function AdvancedFilterModal({ isOpen, onClose, filters, onFilters }) {
             </div>
           </div>
 
-          {/* 5. Kullanıcı Doğrulama sayısı */}
-          <div className="filter-group">
+          {/* Kullanıcı Doğrulama sayısı */}
+          <div className="filter-group" style={{ marginTop: 12 }}>
             <label className="filter-label">Minimum Kullanıcı Doğrulaması</label>
             <input
               className="filter-input-text"
@@ -800,6 +863,7 @@ const VIEW_PATHS = {
   masraf: '/masraf',
   articles: '/makaleler',
   articleDetail: '/makaleler',
+  profile: '/profil',
 };
 
 function slugify(value) {
@@ -839,6 +903,7 @@ function routeStateFromPath(faults = [], models = {}) {
   if (typeof window === 'undefined') return null;
   const pathname = decodeURIComponent(window.location.pathname || '/').replace(/\/+$/, '') || '/';
 
+  if (pathname === '/profil') return { activeView: 'profile', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/markalar') return { activeView: 'markalar', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/modeller') return { activeView: 'modeller', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/uzman-gorusleri') return { activeView: 'uzman', selectedModel: null, selectedFaultId: null, forceExplorer: false };
@@ -1123,6 +1188,11 @@ function AppContent() {
     return () => window.removeEventListener('hashchange', checkHash);
   }, []);
 
+  // Scroll to top on view/model/fault change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeView, selectedModel, selectedFault]);
+
   const handleNavAction = useCallback((action) => {
     setSelectedModel(null);
     setSelectedFault(null);
@@ -1136,6 +1206,9 @@ function AppContent() {
       setSort('activity-desc');
       setForceExplorer(false);
       pushNav({ activeView: 'home', selectedModel: null, selectedFaultId: null, selectedArticleId: null, forceExplorer: false, search: '', filters: emptyFilters });
+    } else if (action === 'profile') {
+      setActiveView('profile');
+      pushNav({ activeView: 'profile', selectedModel: null, selectedFaultId: null, selectedArticleId: null });
     } else if (action === 'brands') {
       setActiveView('markalar');
       pushNav({ activeView: 'markalar', selectedModel: null, selectedFaultId: null, selectedArticleId: null });
@@ -1321,12 +1394,52 @@ function AppContent() {
     setToast('Arıza silindi.');
   };
 
-  const handleApprovePending = async (fault) => {
-    const normalized = normalizeFault(fault);
-    const exists = data.some(f => String(f.id) === String(normalized.id));
-    await persistFaults(exists ? data.map(f => (String(f.id) === String(normalized.id) ? normalized : f)) : [normalized, ...data]);
-    await ensureModelRecordForFault(normalized);
-    refreshPending();
+  const handleApprovePending = async (faultOrArray) => {
+    // Dizi gelirse toplu ekle (stale closure'dan kaçınmak için tek seferde yaz)
+    if (Array.isArray(faultOrArray)) {
+      const normalizedList = faultOrArray.map(f => normalizeFault(f));
+      let next = [...data];
+      for (const normalized of normalizedList) {
+        const exists = next.some(f => String(f.id) === String(normalized.id));
+        next = exists
+          ? next.map(f => (String(f.id) === String(normalized.id) ? normalized : f))
+          : [normalized, ...next];
+      }
+      await persistFaults(next);
+      for (const normalized of normalizedList) {
+        await ensureModelRecordForFault(normalized);
+      }
+      refreshPending();
+    } else {
+      const normalized = normalizeFault(faultOrArray);
+      const exists = data.some(f => String(f.id) === String(normalized.id));
+      await persistFaults(exists ? data.map(f => (String(f.id) === String(normalized.id) ? normalized : f)) : [normalized, ...data]);
+      await ensureModelRecordForFault(normalized);
+      refreshPending();
+    }
+  };
+
+  const handleApproveModels = async (modelsList) => {
+    const nowIso = new Date().toISOString();
+    let next = { ...models };
+    for (const modelData of modelsList) {
+      const modelKey = cleanText(modelData.model);
+      if (!modelKey) continue;
+      const storedKey = findStoredModelKey(next, modelKey) || modelKey;
+      const existingModel = next[storedKey] || {};
+      const source = {
+        ...existingModel,
+        ...modelData,
+        createdAt: modelData.createdAt || existingModel.createdAt,
+      };
+      next[storedKey] = buildStoredModelRecord({
+        model: storedKey,
+        brand: modelData.brand,
+        source,
+        nowIso,
+      });
+    }
+    await persistModels(next);
   };
 
   const handleSaveModel = async (key, modelData) => {
@@ -1364,12 +1477,28 @@ function AppContent() {
   };
 
   const handleDeleteModel = async (key) => {
-    if (!key || !models[key]) return;
-    if (!confirm('Bu model sayfasını silmek istediğinize emin misiniz?')) return;
-    const next = { ...models };
-    delete next[key];
-    setModels(next);
-    const savedRemotely = await saveAdminModels(next);
+    if (!key) return;
+    const hasModelPage = !!models[key];
+    const hasFaults = data.some(f => f.model === key);
+    if (!hasModelPage && !hasFaults) return;
+    const msg = hasModelPage && hasFaults
+      ? `"${key}" model sayfasını ve bu modele ait tüm arıza kayıtlarını silmek istediğinize emin misiniz?`
+      : hasModelPage
+        ? `"${key}" model sayfasını silmek istediğinize emin misiniz?`
+        : `"${key}" modeline ait tüm arıza kayıtlarını silmek istediğinize emin misiniz?`;
+    if (!confirm(msg)) return;
+    // Modeli sil
+    if (hasModelPage) {
+      const nextModels = { ...models };
+      delete nextModels[key];
+      setModels(nextModels);
+      await saveAdminModels(nextModels);
+    }
+    // Arızaları sil
+    if (hasFaults) {
+      const nextData = data.filter(f => f.model !== key);
+      await persistFaults(nextData);
+    }
     if (selectedModel === key) {
       setSelectedModel(null);
     }
@@ -1378,10 +1507,29 @@ function AppContent() {
     setActiveView('modeller');
     setForceExplorer(false);
     pushNav({ activeView: 'modeller', selectedModel: null, selectedFaultId: null, selectedArticleId: null, forceExplorer: false });
-    setToast(savedRemotely
-      ? 'Model sayfası silindi.'
-      : 'Model sayfası bu tarayıcıda silindi; sunucuya yazılamadı.'
-    );
+    setToast('Model silindi.');
+  };
+
+  const handleBulkDeleteModels = async (keys) => {
+    if (!keys || keys.length === 0) return;
+    // Model sayfalarını sil
+    const nextModels = { ...models };
+    keys.forEach(key => { delete nextModels[key]; });
+    setModels(nextModels);
+    await saveAdminModels(nextModels);
+    // Arızaları sil
+    const keySet = new Set(keys);
+    const nextData = data.filter(f => !keySet.has(f.model));
+    await persistFaults(nextData);
+    if (keySet.has(selectedModel)) {
+      setSelectedModel(null);
+    }
+    setSelectedFault(null);
+    setSelectedArticleId(null);
+    setActiveView('modeller');
+    setForceExplorer(false);
+    pushNav({ activeView: 'modeller', selectedModel: null, selectedFaultId: null, selectedArticleId: null, forceExplorer: false });
+    setToast(`${keys.length} model silindi.`);
   };
 
   const handleSaveArticle = async (article) => {
@@ -1542,9 +1690,18 @@ function AppContent() {
               }}
               onNewModel={() => setEditModel({ key: null, data: null })}
               onDeleteModel={handleDeleteModel}
+              onBulkDeleteModels={handleBulkDeleteModels}
             />
           </main>
         </div>
+      ) : activeView === 'profile' ? (
+        <ProfilePage
+          user={user}
+          allFaults={data}
+          onBack={goHome}
+          onFaultClick={(f) => { setSelectedFault(f); pushNav({ selectedFaultId: f.id }); }}
+          onUpdateUser={(updated) => setUser(updated)}
+        />
       ) : activeView === 'uzman' ? (
         <div className="layout layout-detail">
           <main className="main main-detail" style={{ maxWidth: 1000 }}>
@@ -1748,6 +1905,7 @@ function AppContent() {
         faults={data}
         models={models}
         onApproveFaults={handleApprovePending}
+        onApproveModels={handleApproveModels}
         onEditFault={setEditFault}
         onEditModel={(key, data) => setEditModel({ key, data })}
         onNewModel={() => setEditModel({ key: null, data: null })}
@@ -1776,8 +1934,13 @@ function AppContent() {
           onClose={() => setAdvancedOpen(false)}
           filters={filters}
           onFilters={setFilters}
+          allData={data}
+          categories={categories}
+          motorTypes={motorTypes}
         />
       )}
+      <Footer onNavAction={handleNavAction} />
+      <ScrollToTop />
       {toast && (
         <Toast message={toast} onDone={() => setToast(null)} />
       )}

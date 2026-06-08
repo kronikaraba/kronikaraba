@@ -25,10 +25,25 @@ const BRAND_COLORS = {
   'Subaru': '#013C74', 'Alfa Romeo': '#981E32', 'Jeep': '#1D4D2B',
 };
 
-export default function AllModelsPage({ data, models, onModelClick, adminMode, onAddFault, onNewModel, onDeleteModel, content }) {
+// Helper to get brand gradient
+const getBrandGradient = (brand) => {
+  const color = BRAND_COLORS[brand] || '#475569';
+  return `linear-gradient(135deg, ${color} 0%, ${color}bb 100%)`;
+};
+
+// SVG Vehicle Silhouette Icon
+const VehicleSilhouette = () => (
+  <svg viewBox="0 0 100 40" width="45" height="18" fill="currentColor" className="am-card-car-silhouette" style={{ opacity: 0.9, color: 'rgba(255, 255, 255, 0.95)' }}>
+    <path d="M10,25 C10,25 12,20 18,18 C24,16 35,16 42,10 C48,5 65,5 72,12 C78,18 88,20 90,25 C92,27 92,29 90,30 C85,30 82,30 82,30 C80,27 75,25 70,25 C65,25 60,27 58,30 L32,30 C30,27 25,25 20,25 C15,25 10,27 8,30 C8,30 8,28 10,25 Z M20,22 C24,22 27,25 27,29 C27,33 24,36 20,36 C16,36 13,33 13,29 C13,25 16,22 20,22 Z M70,22 C74,22 77,25 77,29 C77,33 74,36 70,36 C66,36 63,33 63,29 C63,25 66,22 70,22 Z" />
+  </svg>
+);
+
+export default function AllModelsPage({ data, models, onModelClick, adminMode, onAddFault, onNewModel, onDeleteModel, onBulkDeleteModels, content }) {
   const [selectedBrand, setSelectedBrand] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sort, setSort] = useState('newest-desc');
+  const [selectedModels, setSelectedModels] = useState(new Set());
+  const [selectMode, setSelectMode] = useState(false);
   const mc = content?.modeller || {};
 
   // Build model stats from fault data and stored model pages.
@@ -55,7 +70,7 @@ export default function AllModelsPage({ data, models, onModelClick, adminMode, o
       stats[key].faultCount++;
       stats[key].totalReports += f.reportCount;
       stats[key].totalCost += f.avgCost;
-      if (f.risk === 'YÜKSEK') stats[key].riskHigh++;
+      if (f.risk === 'YÜKSEK' || f.risk === 'FECİ') stats[key].riskHigh++;
       else if (f.risk === 'ORTA') stats[key].riskMedium++;
       else stats[key].riskLow++;
       stats[key].categories.add(f.category);
@@ -164,6 +179,41 @@ export default function AllModelsPage({ data, models, onModelClick, adminMode, o
     );
   };
 
+  const toggleSelectModel = (modelName) => {
+    setSelectedModels(prev => {
+      const next = new Set(prev);
+      if (next.has(modelName)) next.delete(modelName);
+      else next.add(modelName);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedModels.size === filteredModels.length) {
+      setSelectedModels(new Set());
+    } else {
+      setSelectedModels(new Set(filteredModels.map(m => m.model)));
+    }
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedModels(new Set());
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedModels.size === 0) return;
+    const modelList = [...selectedModels];
+    if (!confirm(`${modelList.length} modeli silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz.`)) return;
+    if (onBulkDeleteModels) {
+      onBulkDeleteModels(modelList);
+    }
+    exitSelectMode();
+  };
+
+  const allFilteredSelected = filteredModels.length > 0 && selectedModels.size === filteredModels.length;
+  const someSelected = selectedModels.size > 0 && !allFilteredSelected;
+
   return (
     <div className="page-view">
       {/* Hero */}
@@ -211,14 +261,82 @@ export default function AllModelsPage({ data, models, onModelClick, adminMode, o
         </label>
 
         {adminMode && (
-          <button type="button" className="am-admin-btn" onClick={onNewModel}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Model Ekle
-          </button>
+          <>
+            <button type="button" className="am-admin-btn" onClick={onNewModel}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Model Ekle
+            </button>
+            {!selectMode ? (
+              <button
+                type="button"
+                className="am-admin-btn"
+                style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}
+                onClick={() => setSelectMode(true)}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <polyline points="14 18 16 20 20 14" />
+                </svg>
+                Toplu Seç
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="am-admin-btn"
+                style={{ background: 'rgba(100,116,139,0.15)', color: '#94a3b8', border: '1px solid rgba(100,116,139,0.2)' }}
+                onClick={exitSelectMode}
+              >
+                İptal
+              </button>
+            )}
+          </>
         )}
       </div>
+
+      {/* Bulk action bar */}
+      {adminMode && selectMode && (
+        <div className="am-bulk-bar">
+          <label className="am-bulk-check-wrap" onClick={toggleSelectAll}>
+            <span className={`am-bulk-checkbox${allFilteredSelected ? ' checked' : someSelected ? ' indeterminate' : ''}`}>
+              {allFilteredSelected && (
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
+              {someSelected && !allFilteredSelected && (
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              )}
+            </span>
+            <span className="am-bulk-label">
+              {allFilteredSelected ? 'Tümünün seçimini kaldır' : 'Tümünü seç'}
+            </span>
+          </label>
+          <span className="am-bulk-count">
+            {selectedModels.size > 0 ? `${selectedModels.size} model seçildi` : 'Model seçin'}
+          </span>
+          <button
+            type="button"
+            className="am-bulk-delete-btn"
+            disabled={selectedModels.size === 0}
+            onClick={handleBulkDelete}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14H6L5 6" />
+              <path d="M10 11v6" />
+              <path d="M14 11v6" />
+              <path d="M9 6V4h6v2" />
+            </svg>
+            {selectedModels.size > 0 ? `${selectedModels.size} Modeli Sil` : 'Sil'}
+          </button>
+        </div>
+      )}
 
       {/* Brand pills */}
       <div className="am-brand-pills">
@@ -259,50 +377,79 @@ export default function AllModelsPage({ data, models, onModelClick, adminMode, o
       ) : (
         <div className="am-grid">
           {filteredModels.map(m => {
-            const color = BRAND_COLORS[m.brand] || '#374151';
+            const isSelected = selectedModels.has(m.model);
             return (
               <div
                 key={`${m.brand}-${m.model}`}
-                className="am-card"
-                onClick={() => onModelClick(m.model)}
+                className={`am-card${selectMode && isSelected ? ' am-card-selected' : ''}`}
+                onClick={() => {
+                  if (selectMode) {
+                    toggleSelectModel(m.model);
+                  } else {
+                    onModelClick(m.model);
+                  }
+                }}
+                style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: selectMode ? 'pointer' : undefined }}
               >
-                <div className="am-card-top">
-                  <div className="am-card-brand-dot" style={{ background: color }} />
-                  <span className="am-card-brand">{m.brand}</span>
+                {/* Select mode checkbox overlay */}
+                {adminMode && selectMode && (
+                  <div
+                    className="am-card-select-overlay"
+                    onClick={e => { e.stopPropagation(); toggleSelectModel(m.model); }}
+                  >
+                    <span className={`am-card-checkbox${isSelected ? ' checked' : ''}`}>
+                      {isSelected && (
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {/* Brand Gradient Header */}
+                <div className="am-card-header" style={{ background: getBrandGradient(m.brand), padding: '16px 20px', color: '#fff', position: 'relative' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="am-card-brand" style={{ fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255, 255, 255, 0.9)' }}>{m.brand}</span>
+                    <VehicleSilhouette />
+                  </div>
+                  <h3 className="am-card-model" style={{ color: '#fff', margin: '8px 0 0 0', fontSize: '18px', fontWeight: 700 }}>{m.model}</h3>
                   {m.riskHigh > 0 && (
-                    <span className="am-card-risk-badge">
-                      {m.riskHigh} yüksek risk
+                    <span className="am-card-risk-badge" style={{ position: 'absolute', bottom: 12, right: 20, background: 'rgba(239, 68, 68, 0.9)', color: '#fff', padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>
+                      {m.riskHigh} YÜKSEK RİSK
                     </span>
                   )}
                 </div>
-                <h3 className="am-card-model">{m.model}</h3>
-                <div className="am-card-cats">
-                  {m.categories.slice(0, 3).map(c => (
-                    <span key={c} className="am-card-cat">{c}</span>
-                  ))}
-                  {m.categories.length > 3 && (
-                    <span className="am-card-cat am-card-cat-more">+{m.categories.length - 3}</span>
-                  )}
-                </div>
-                <div className="am-card-stats">
-                  <div className="am-stat">
-                    <span className="am-stat-val">{m.faultCount}</span>
-                    <span className="am-stat-lbl">Arıza</span>
+
+                <div className="am-card-body" style={{ padding: '16px 20px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div className="am-card-cats" style={{ marginBottom: 12 }}>
+                    {m.categories.slice(0, 3).map(c => (
+                      <span key={c} className="am-card-cat">{c}</span>
+                    ))}
+                    {m.categories.length > 3 && (
+                      <span className="am-card-cat am-card-cat-more">+{m.categories.length - 3}</span>
+                    )}
                   </div>
-                  <div className="am-stat">
-                    <span className="am-stat-val">{fmt(m.totalReports)}</span>
-                    <span className="am-stat-lbl">Doğrulama</span>
-                  </div>
-                  <div className="am-stat">
-                    <span className="am-stat-val">₺{fmt(m.avgCost)}</span>
-                    <span className="am-stat-lbl">Ort. Masraf</span>
+                  <div className="am-card-stats">
+                    <div className="am-stat">
+                      <span className="am-stat-val">{m.faultCount}</span>
+                      <span className="am-stat-lbl">Arıza</span>
+                    </div>
+                    <div className="am-stat">
+                      <span className="am-stat-val">{fmt(m.totalReports)}</span>
+                      <span className="am-stat-lbl">Doğrulama</span>
+                    </div>
+                    <div className="am-stat">
+                      <span className="am-stat-val">₺{fmt(m.avgCost)}</span>
+                      <span className="am-stat-lbl">Ort. Masraf</span>
+                    </div>
                   </div>
                 </div>
                 {getRiskBar(m)}
 
-                {/* Admin: arıza ekle */}
-                {adminMode && (
-                  <div className="am-card-admin" onClick={e => e.stopPropagation()}>
+                {/* Admin buttons */}
+                {adminMode && !selectMode && (
+                  <div className="am-card-admin" onClick={e => e.stopPropagation()} style={{ padding: '0 20px 16px 20px' }}>
                     <button
                       type="button"
                       className="am-card-admin-btn"
@@ -314,31 +461,31 @@ export default function AllModelsPage({ data, models, onModelClick, adminMode, o
                       </svg>
                       Arıza Ekle
                     </button>
-                    {m.hasModelPage && (
-                      <button
-                        type="button"
-                        className="am-card-admin-btn am-card-delete-btn"
-                        onClick={() => onDeleteModel && onDeleteModel(m.model)}
-                        title="Kayıtlı model sayfasını sil"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6l-1 14H6L5 6" />
-                          <path d="M10 11v6" />
-                          <path d="M14 11v6" />
-                          <path d="M9 6V4h6v2" />
-                        </svg>
-                        Model Sil
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="am-card-admin-btn am-card-delete-btn"
+                      onClick={() => onDeleteModel && onDeleteModel(m.model)}
+                      title={m.hasModelPage ? 'Model sayfasını ve arızalarını sil' : 'Bu modelin arızalarını sil'}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14H6L5 6" />
+                        <path d="M10 11v6" />
+                        <path d="M14 11v6" />
+                        <path d="M9 6V4h6v2" />
+                      </svg>
+                      Model Sil
+                    </button>
                   </div>
                 )}
 
-                <div className="am-card-arrow">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </div>
+                {!selectMode && (
+                  <div className="am-card-arrow" style={{ right: 20, bottom: 20 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </div>
+                )}
               </div>
             );
           })}
