@@ -6,7 +6,7 @@ import { AuthModal, loadUser, logout } from './auth.jsx';
 import { CommentSection, getCommentCount, buildCommentCountMap, buildFaultActivityMap, ensureSeededPostsForFaults } from './comments.jsx';
 import ModelDetailPage from './ModelDetailPage.jsx';
 import FaultDetailPage from './FaultDetailPage.jsx';
-import { loadAdminFaults, saveAdminFaults, loadAdminModels, saveAdminModels, loadPending, savePending, loadForum, saveForum, loadArticles, saveArticles } from './adminStorage.js';
+import { loadAdminFaults, saveAdminFaults, loadAdminModels, saveAdminModels, loadPending, savePending, loadForum, saveForum, loadArticles, saveArticles, syncDirtyToServer } from './adminStorage.js';
 import { normalizeFault, getPendingId } from './faultUtils.js';
 import { LiveEditProvider, Editable, useLiveEdit } from './liveEdit.jsx';
 import ScrollToTop from './ScrollToTop.jsx';
@@ -993,6 +993,8 @@ function AppContent() {
         console.error("Failed to load initial data", err);
       } finally {
         setLoading(false);
+        // Background: sync any localStorage-only data to server (admin only)
+        syncDirtyToServer().catch(() => {});
       }
     }
     initAll();

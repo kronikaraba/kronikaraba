@@ -132,6 +132,32 @@ async function apiSave(key, data) {
   }
 }
 
+/**
+ * Sync any dirty (unsynced) localStorage data to the server.
+ * Called on app startup when admin is authenticated.
+ * This ensures localStorage-only edits eventually reach the server.
+ */
+export async function syncDirtyToServer() {
+  const token = getApiToken();
+  if (!token) return; // not admin, skip
+
+  const keysToSync = ['faults', 'models', 'pending', 'forum', 'articles', 'content', 'categories', 'motorTypes'];
+  
+  for (const key of keysToSync) {
+    if (lsIsDirty(key)) {
+      const localData = lsLoad(key);
+      if (localData != null) {
+        console.info(`syncDirtyToServer: syncing dirty key "${key}" to server...`);
+        try {
+          await apiSave(key, localData);
+        } catch (err) {
+          console.warn(`syncDirtyToServer: failed to sync "${key}":`, err);
+        }
+      }
+    }
+  }
+}
+
 // ── SHA-256 hash utility ─────────────────────────────────────────────────────
 async function hashPassword(password) {
   const encoder = new TextEncoder();
