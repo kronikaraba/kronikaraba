@@ -82,20 +82,25 @@ async function apiLoad(key) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    // Server responded successfully — this is the source of truth.
-    // Always clear the dirty flag since we got fresh server data.
+    // Server responded successfully — clear the dirty flag.
     lsSetDirty(key, false);
 
     if (data != null) {
-      // Sync localStorage with the authoritative server data.
+      // Server has authoritative data — sync localStorage with it.
       lsSave(key, data);
       return data;
     }
 
-    // Server returned null → the data store is empty / was cleared.
-    // Return null so that the caller can decide whether to use defaults.
-    // Also clear localStorage so stale data from past sessions doesn't persist.
-    try { localStorage.removeItem(LS_PREFIX + key); } catch {}
+    // Server returned null — the blob doesn't exist yet.
+    // If we have localStorage data (e.g. from admin edits that failed to sync),
+    // use it and try to push it to the server so all devices get it.
+    const localData = lsLoad(key);
+    if (localData != null) {
+      // Auto-sync local data to server in the background
+      apiSave(key, localData).catch(() => {});
+      return localData;
+    }
+
     return null;
   } catch (err) {
     console.warn(`apiLoad(${key}) failed, falling back to localStorage:`, err);
