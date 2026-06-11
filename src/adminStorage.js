@@ -72,6 +72,7 @@ async function apiLoad(key) {
   try {
     const res = await fetch(`${API_BASE}?key=${key}`, {
       headers: authHeaders(),
+      cache: 'no-store',
     });
     if (res.status === 403) {
       // Unauthorized — don't fallback to localStorage for protected keys
@@ -81,17 +82,21 @@ async function apiLoad(key) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    const localData = lsLoad(key);
-    if (lsIsDirty(key) && localData != null) {
-      return localData;
-    }
-    if (data == null && localData != null) {
-      return localData;
+    // Server responded successfully — this is the source of truth.
+    // Always clear the dirty flag since we got fresh server data.
+    lsSetDirty(key, false);
+
+    if (data != null) {
+      // Sync localStorage with the authoritative server data.
+      lsSave(key, data);
+      return data;
     }
 
-    // Sync localStorage with API data so it stays fresh when there are no unsynced local edits.
-    if (data != null) lsSave(key, data);
-    return data;
+    // Server returned null → the data store is empty / was cleared.
+    // Return null so that the caller can decide whether to use defaults.
+    // Also clear localStorage so stale data from past sessions doesn't persist.
+    try { localStorage.removeItem(LS_PREFIX + key); } catch {}
+    return null;
   } catch (err) {
     console.warn(`apiLoad(${key}) failed, falling back to localStorage:`, err);
     return lsLoad(key);
@@ -200,7 +205,19 @@ export function adminLogout() {
 // Faults
 export async function loadAdminFaults() {
   const data = await apiLoad('faults');
-  return Array.isArray(data) ? data : defaultFaults;
+  // Only fall back to hardcoded defaults when the server is unreachable
+  // AND localStorage is empty (data === null from catch branch).
+  // When the server explicitly returns null, it means the data store exists
+  // but is empty — use an empty array, not defaults with old/deleted faults.
+  if (Array.isArray(data)) return data;
+  // apiLoad returns null when either server returned null or it was unreachable.
+  // Check if we got null because server was down (localStorage fallback) or
+  // because the server store is genuinely empty. We distinguish by checking
+  // if localStorage still has data (offline fallback path).
+  const localFallback = lsLoad('faults');
+  if (Array.isArray(localFallback)) return localFallback;
+  // No server data AND no localStorage → first-ever visit, use defaults.
+  return defaultFaults;
 }
 
 export async function saveAdminFaults(data) {
@@ -210,7 +227,11 @@ export async function saveAdminFaults(data) {
 // Models
 export async function loadAdminModels() {
   const data = await apiLoad('models');
-  return (data && typeof data === 'object' && !Array.isArray(data)) ? data : defaultModelDetails;
+  if (data && typeof data === 'object' && !Array.isArray(data)) return data;
+  const localFallback = lsLoad('models');
+  if (localFallback && typeof localFallback === 'object' && !Array.isArray(localFallback)) return localFallback;
+  // No server data AND no localStorage → first-ever visit, use defaults.
+  return defaultModelDetails;
 }
 
 export async function saveAdminModels(data) {
