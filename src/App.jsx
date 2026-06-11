@@ -15,7 +15,7 @@ import ProfilePage from './ProfilePage.jsx';
 import FaultEditModal from './faultEditModal.jsx';
 import ModelEditModal from './modelEditModal.jsx';
 import AdminHub from './adminHub.jsx';
-import { MarkalarlPage, UzmanPage, MasrafPage } from './Pages.jsx';
+import { MasrafPage } from './MasrafPage.jsx';
 import ArticlesPage, { ArticleDetailPage } from './ArticlesPage.jsx';
 import ArticleEditModal from './ArticleEditModal.jsx';
 import LandingPage from './LandingPage.jsx';
@@ -107,14 +107,8 @@ function Navbar({ content, search, onSearch, onAdd, user, onLogin, onRegister, o
         <a href="/" className={`nav-link${activeView === 'home' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('reset'); }}>
           <Editable value={nb.navLinks.home} path={['navbar', 'navLinks', 'home']} />
         </a>
-        <a href="/markalar" className={`nav-link${activeView === 'markalar' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('brands'); }}>
-          <Editable value={nb.navLinks.brands} path={['navbar', 'navLinks', 'brands']} />
-        </a>
         <a href="/modeller" className={`nav-link${activeView === 'modeller' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('modeller'); }}>
           <Editable value={nb.navLinks.models || 'Tüm Modeller'} path={['navbar', 'navLinks', 'models']} />
-        </a>
-        <a href="/uzman-gorusleri" className={`nav-link${activeView === 'uzman' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('uzman'); }}>
-          <Editable value={nb.navLinks.uzman || 'Uzman Görüşleri'} path={['navbar', 'navLinks', 'uzman']} />
         </a>
         <a href="/masraf" className={`nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
           <Editable value={nb.navLinks.masraf || 'Masraf Rehberi'} path={['navbar', 'navLinks', 'masraf']} />
@@ -357,14 +351,8 @@ function Sidebar({ content, filters, onFilters, allData, isOpen, onClose, onOpen
           <a href="/" className={`sidebar-nav-link${activeView === 'home' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('reset'); }}>
             <span>🏠</span> {nb.navLinks.home}
           </a>
-          <a href="/markalar" className={`sidebar-nav-link${activeView === 'markalar' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('brands'); }}>
-            <span>🏢</span> {nb.navLinks.brands}
-          </a>
           <a href="/modeller" className={`sidebar-nav-link${activeView === 'modeller' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('modeller'); }}>
             <span>🚗</span> {nb.navLinks.models || 'Tüm Modeller'}
-          </a>
-          <a href="/uzman-gorusleri" className={`sidebar-nav-link${activeView === 'uzman' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('uzman'); }}>
-            <span>🔍</span> {nb.navLinks.uzman || 'Uzman Görüşleri'}
           </a>
           <a href="/masraf" className={`sidebar-nav-link${activeView === 'masraf' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); onNavAction('masraf'); }}>
             <span>💰</span> {nb.navLinks.masraf || 'Masraf Rehberi'}
@@ -857,9 +845,7 @@ const EMPTY_FILTERS = {
 
 const VIEW_PATHS = {
   home: '/',
-  markalar: '/markalar',
   modeller: '/modeller',
-  uzman: '/uzman-gorusleri',
   masraf: '/masraf',
   articles: '/makaleler',
   articleDetail: '/makaleler',
@@ -904,9 +890,7 @@ function routeStateFromPath(faults = [], models = {}) {
   const pathname = decodeURIComponent(window.location.pathname || '/').replace(/\/+$/, '') || '/';
 
   if (pathname === '/profil') return { activeView: 'profile', selectedModel: null, selectedFaultId: null, forceExplorer: false };
-  if (pathname === '/markalar') return { activeView: 'markalar', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/modeller') return { activeView: 'modeller', selectedModel: null, selectedFaultId: null, forceExplorer: false };
-  if (pathname === '/uzman-gorusleri') return { activeView: 'uzman', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/masraf') return { activeView: 'masraf', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname === '/makaleler') return { activeView: 'articles', selectedModel: null, selectedFaultId: null, forceExplorer: false };
   if (pathname.startsWith('/makaleler/')) {
@@ -1209,12 +1193,6 @@ function AppContent() {
     } else if (action === 'profile') {
       setActiveView('profile');
       pushNav({ activeView: 'profile', selectedModel: null, selectedFaultId: null, selectedArticleId: null });
-    } else if (action === 'brands') {
-      setActiveView('markalar');
-      pushNav({ activeView: 'markalar', selectedModel: null, selectedFaultId: null, selectedArticleId: null });
-    } else if (action === 'uzman') {
-      setActiveView('uzman');
-      pushNav({ activeView: 'uzman', selectedModel: null, selectedFaultId: null, selectedArticleId: null });
     } else if (action === 'modeller') {
       setActiveView('modeller');
       pushNav({ activeView: 'modeller', selectedModel: null, selectedFaultId: null, selectedArticleId: null });
@@ -1661,21 +1639,6 @@ function AppContent() {
             />
           </main>
         </div>
-      ) : activeView === 'markalar' ? (
-        <div className="layout layout-detail">
-          <main className="main main-detail" style={{ maxWidth: 1000 }}>
-            <MarkalarlPage
-              data={data}
-              content={content}
-              onBrandSelect={(brand) => {
-                setActiveView('home');
-                const newFilters = { ...filters, brand };
-                setFilters(newFilters);
-                pushNav({ activeView: 'home', filters: newFilters });
-              }}
-            />
-          </main>
-        </div>
       ) : activeView === 'modeller' ? (
         <div className="layout layout-detail">
           <main className="main main-detail" style={{ maxWidth: 1100 }}>
@@ -1702,12 +1665,6 @@ function AppContent() {
           onFaultClick={(f) => { setSelectedFault(f); pushNav({ selectedFaultId: f.id }); }}
           onUpdateUser={(updated) => setUser(updated)}
         />
-      ) : activeView === 'uzman' ? (
-        <div className="layout layout-detail">
-          <main className="main main-detail" style={{ maxWidth: 1000 }}>
-            <UzmanPage data={data} content={content} onModelClick={(m) => { setSelectedModel(m); pushNav({ selectedModel: m }); }} />
-          </main>
-        </div>
       ) : activeView === 'masraf' ? (
         <div className="layout layout-detail">
           <main className="main main-detail" style={{ maxWidth: 1000 }}>

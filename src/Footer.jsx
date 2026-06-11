@@ -42,7 +42,6 @@ export default function Footer({ onNavAction }) {
           <h4 className="footer-col-title">Hızlı Erişim</h4>
           <ul className="footer-links">
             <li><a href="/" onClick={(e) => handleLink(e, 'reset')}>Ana Sayfa</a></li>
-            <li><a href="/markalar" onClick={(e) => handleLink(e, 'brands')}>Markalar</a></li>
             <li><a href="/modeller" onClick={(e) => handleLink(e, 'modeller')}>Tüm Modeller</a></li>
             <li><a href="/makaleler" onClick={(e) => handleLink(e, 'articles')}>Makaleler</a></li>
           </ul>
@@ -51,7 +50,6 @@ export default function Footer({ onNavAction }) {
         <div className="footer-col">
           <h4 className="footer-col-title">Araçlar</h4>
           <ul className="footer-links">
-            <li><a href="/uzman-gorusleri" onClick={(e) => handleLink(e, 'uzman')}>Uzman Görüşleri</a></li>
             <li><a href="/masraf" onClick={(e) => handleLink(e, 'masraf')}>Masraf Rehberi</a></li>
             <li><a href="/arizalar" onClick={(e) => handleLink(e, 'explore')}>Tüm Arızalar</a></li>
           </ul>

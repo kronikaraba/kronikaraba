@@ -339,29 +339,31 @@ export default function AllModelsPage({ data, models, onModelClick, adminMode, o
       )}
 
       {/* Brand pills */}
-      <div className="am-brand-pills">
-        <button
-          type="button"
-          className={`am-brand-pill${!selectedBrand ? ' active' : ''}`}
-          onClick={() => setSelectedBrand('')}
-        >
-          Tümü <span className="am-pill-count">{totalModels}</span>
-        </button>
-        {brands.map(b => {
-          const color = BRAND_COLORS[b.name] || '#374151';
-          return (
-            <button
-              key={b.name}
-              type="button"
-              className={`am-brand-pill${selectedBrand === b.name ? ' active' : ''}`}
-              onClick={() => setSelectedBrand(prev => prev === b.name ? '' : b.name)}
-            >
-              <span className="am-pill-dot" style={{ background: color }} />
-              {b.name}
-              <span className="am-pill-count">{b.modelCount}</span>
-            </button>
-          );
-        })}
+      <div className="am-brand-pills-outer">
+        <div className="am-brand-pills">
+          <button
+            type="button"
+            className={`am-brand-pill${!selectedBrand ? ' active' : ''}`}
+            onClick={() => setSelectedBrand('')}
+          >
+            Tümü <span className="am-pill-count">{totalModels}</span>
+          </button>
+          {brands.map(b => {
+            const color = BRAND_COLORS[b.name] || '#374151';
+            return (
+              <button
+                key={b.name}
+                type="button"
+                className={`am-brand-pill${selectedBrand === b.name ? ' active' : ''}`}
+                onClick={() => setSelectedBrand(prev => prev === b.name ? '' : b.name)}
+              >
+                <span className="am-pill-dot" style={{ background: color }} />
+                {b.name}
+                <span className="am-pill-count">{b.modelCount}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Models grid */}

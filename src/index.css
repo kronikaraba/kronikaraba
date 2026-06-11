@@ -8566,6 +8566,7 @@ body:has(.forum-lightbox) {
 .lp-root,
 .landing-page-wrap {
   max-width: 100%;
+  min-width: 0;
 }
 
 .lp-forum-layout,
@@ -8640,6 +8641,8 @@ body:has(.forum-lightbox) {
   align-items: center;
   gap: 12px;
   padding: 16px 0 8px;
+  min-width: 0;
+  width: 100%;
 }
 
 .am-search-wrap {
@@ -8744,11 +8747,20 @@ body:has(.forum-lightbox) {
 }
 
 /* ── Brand filter pills ── */
+/* ── Brand pills outer wrapper ── */
+.am-brand-pills-outer {
+  overflow-x: hidden;
+  width: 100%;
+  min-width: 0;
+}
+
 .am-brand-pills {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   padding: 10px 0 16px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .am-brand-pill {
@@ -8812,6 +8824,7 @@ body:has(.forum-lightbox) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 14px;
+  min-width: 0;
 }
 
 .am-card {
@@ -8819,7 +8832,7 @@ body:has(.forum-lightbox) {
   background: var(--white);
   border: 1.5px solid var(--gray-150, var(--gray-200));
   border-radius: 12px;
-  padding: 18px 20px 16px;
+  padding: 0;
   cursor: pointer;
   transition: all 0.2s ease;
   overflow: hidden;
@@ -9181,31 +9194,125 @@ body:has(.forum-lightbox) {
 @media (max-width: 700px) {
   .am-grid {
     grid-template-columns: 1fr;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
   }
 
   .am-toolbar {
     flex-direction: column;
     align-items: stretch;
+    gap: 8px;
+    padding: 12px 0 6px;
+    width: 100%;
+    min-width: 0;
   }
 
-  .am-admin-btn {
-    justify-content: center;
+  .am-search-wrap {
+    width: 100%;
   }
 
   .am-sort-wrap {
     width: 100%;
+    min-width: 0;
+  }
+
+  .am-admin-btn {
+    justify-content: center;
+    padding: 10px 14px;
+    font-size: 12.5px;
+  }
+
+  /* Admin butonlarını yan yana koy */
+  .am-toolbar > .am-admin-btn {
+    flex: 1;
+  }
+
+  .am-brand-pills-outer {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .am-brand-pills-outer::-webkit-scrollbar {
+    display: none;
   }
 
   .am-brand-pills {
-    overflow-x: auto;
     flex-wrap: nowrap;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
     padding-bottom: 8px;
+    gap: 6px;
+    min-width: max-content;
+    max-width: none;
+    width: auto;
   }
 
-  .am-brand-pills::-webkit-scrollbar {
-    display: none;
+  .am-brand-pill {
+    font-size: 11.5px;
+    padding: 6px 11px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Kart içi padding'leri küçült */
+  .am-card-header {
+    padding: 13px 14px !important;
+  }
+
+  .am-card-body {
+    padding: 12px 14px !important;
+  }
+
+  .am-card-admin {
+    padding: 0 14px 12px 14px !important;
+  }
+
+  .am-card-model {
+    font-size: 15px !important;
+  }
+
+  .am-stat-val {
+    font-size: 13px;
+  }
+
+  .am-stat-lbl {
+    font-size: 9.5px;
+  }
+
+  /* Toplu seçim toolbar */
+  .am-bulk-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .am-bulk-delete-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 14px;
+  }
+
+  /* Arrow gizle mobilde (touch cihazda hover yok) */
+  .am-card-arrow {
+    opacity: 0.4;
+    transform: translateY(-50%);
+  }
+}
+
+/* Küçük telefon breakpoint */
+@media (max-width: 400px) {
+  .am-toolbar {
+    padding: 10px 0 4px;
+  }
+
+  .am-card-stats {
+    gap: 0;
+  }
+
+  .am-stat-val {
+    font-size: 12px;
   }
 }
 
